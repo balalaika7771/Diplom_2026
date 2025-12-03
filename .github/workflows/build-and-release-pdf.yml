@@ -13,11 +13,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up LaTeX and build PDF
-        uses: xu-cheng/latex-action@v2
+        uses: xu-cheng/latex-action@v4
         with:
           root_file: main.tex
-          working_directory: .
-          latexmk_use_biber: true
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
