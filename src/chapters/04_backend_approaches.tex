@@ -1,0 +1,444 @@
+\chapter{Backend-подходы к устойчивым системам}
+
+\section{Введение: что такое backend-система и почему она должна быть устойчивой}
+
+Под backend-системой будем понимать серверную часть программного комплекса, реализующую обработку клиентских запросов, выполнение бизнес-логики и взаимодействие с хранилищами данных и внешними сервисами. В распределённых вычислительных системах именно backend-уровень определяет основные характеристики надёжности и производительности, поскольку через него проходит большая часть критических операций.
+
+Устойчивость backend-системы трактуется как её способность сохранять работоспособность при отказах отдельных компонентов, перегрузке, сетевых сбоях и иных эксплуатационных нарушениях. Формально это выражается в сохранении допустимых значений интегральных показателей (доступности, времени отклика, уровня ошибок) при вариациях внешних и внутренних условий в заданных пределах.
+
+Основные проблемы, которые решают backend-подходы:
+\begin{itemize}
+    \item Блокирующие операции: когда один запрос ждёт ответа от другого сервиса, ресурсы простаивают
+    \item Неэффективная передача данных: большие объёмы данных передаются медленно
+    \item Конфликты при чтении и записи: операции записи блокируют операции чтения
+    \item Повторное выполнение операций: из-за сетевых ошибок одна операция может выполниться несколько раз
+    \item Каскадные отказы: отказ одного компонента вызывает отказы других
+    \item Несогласованность данных: разные копии данных могут различаться
+\end{itemize}
+
+В данной главе рассматриваются математические модели для решения этих проблем.
+
+\section{Проблема блокирующих операций в синхронных архитектурах}
+
+Синхронная архитектура — это подход, при котором поток управления блокируется до получения ответа от удалённого сервиса. Проблема заключается в том, что при цепочке вызовов общая задержка растёт линейно, а ресурсы простаивают в ожидании ответов.
+
+Для цепочки из $n$ синхронных вызовов общее время выполнения определяется как сумма времён всех операций:
+
+\begin{equation}
+T_{\text{sync}} = \sum_{i=1}^{n} (T_{\text{request},i} + T_{\text{network},i} + T_{\text{process},i} + T_{\text{network},i} + T_{\text{response},i})
+\label{eq:sync_total_time}
+\end{equation}
+
+где $T_{\text{request},i}$ — время формирования запроса, $T_{\text{network},i}$ — сетевая задержка, $T_{\text{process},i}$ — время обработки на сервере, $T_{\text{response},i}$ — время формирования ответа.
+
+Проблема: при росте $n$ задержка растёт линейно, а использование ресурсов низкое из-за блокировок.
+
+Использование ресурсов в синхронной архитектуре:
+
+\begin{equation}
+U_{\text{sync}} = \frac{T_{\text{process}}}{T_{\text{total}}} = \frac{\sum_{i=1}^{n} T_{\text{process},i}}{\sum_{i=1}^{n} (T_{\text{process},i} + T_{\text{network},i} + T_{\text{wait},i})}
+\label{eq:sync_utilization}
+\end{equation}
+
+где $T_{\text{wait},i}$ — время ожидания ответа.
+
+Решение проблемы блокирующих операций — асинхронная архитектура через очереди сообщений \cite{kleppmann_designing_data}. Рассмотрим модель очереди M/M/1, где интенсивность поступления сообщений составляет $\lambda$ (сообщений в секунду).
+
+Интенсивность обслуживания: $\mu$ (сообщений в секунду).
+
+Условие стабильности очереди:
+
+\begin{equation}
+\rho = \frac{\lambda}{\mu} < 1
+\label{eq:queue_stability}
+\end{equation}
+
+где $\rho$ — коэффициент загрузки.
+
+Средняя длина очереди (формула Поллачека-Хинчина):
+
+\begin{equation}
+L = \frac{\rho}{1-\rho} = \frac{\lambda}{\mu - \lambda}
+\label{eq:queue_length}
+\end{equation}
+
+Среднее время ожидания в очереди (формула Литтла):
+
+\begin{equation}
+W = \frac{L}{\lambda} = \frac{1}{\mu - \lambda}
+\label{eq:waiting_time}
+\end{equation}
+
+Среднее время пребывания в системе:
+
+\begin{equation}
+T_{\text{system}} = W + \frac{1}{\mu} = \frac{1}{\mu - \lambda}
+\label{eq:system_time}
+\end{equation}
+
+Пропускная способность асинхронной системы:
+
+\begin{equation}
+\text{Throughput}_{\text{async}} = \min(\lambda, \mu) = \begin{cases}
+\lambda & \text{если } \rho < 1 \\
+\mu & \text{если } \rho \geq 1
+\end{cases}
+\label{eq:async_throughput}
+\end{equation}
+
+Использование ресурсов в асинхронной архитектуре:
+
+\begin{equation}
+U_{\text{async}} = \rho = \frac{\lambda}{\mu}
+\label{eq:async_utilization}
+\end{equation}
+
+Преимущество: отправитель не блокируется и может обрабатывать другие запросы, что повышает использование ресурсов.
+
+\section{Протоколы коммуникации: проблема эффективности передачи данных}
+
+Различные протоколы имеют различную эффективность передачи данных. Проблема заключается в выборе оптимального протокола для конкретной задачи.
+
+REST использует текстовый формат JSON \cite{rfc_7540,stallings_computer_networking}. Размер сообщения:
+
+\begin{equation}
+S_{\text{REST}} = S_{\text{JSON}} + S_{\text{HTTP\_headers}} + S_{\text{overhead}}
+\label{eq:rest_size}
+\end{equation}
+
+где $S_{\text{JSON}}$ — размер данных в JSON, $S_{\text{HTTP\_headers}}$ — размер HTTP заголовков, $S_{\text{overhead}}$ — накладные расходы протокола.
+
+gRPC использует бинарный формат Protobuf \cite{grpc_design}. Размер сообщения:
+
+\begin{equation}
+S_{\text{gRPC}} = S_{\text{Protobuf}} + S_{\text{gRPC\_headers}} + S_{\text{HTTP2\_overhead}}
+\label{eq:grpc_size}
+\end{equation}
+
+Коэффициент сжатия Protobuf относительно JSON:
+
+\begin{equation}
+r = \frac{S_{\text{JSON}}}{S_{\text{Protobuf}}} \approx 2-3
+\label{eq:compression_ratio}
+\end{equation}
+
+Время передачи сообщения:
+
+\begin{equation}
+T_{\text{transmission}} = \frac{S}{B} + \text{RTT}
+\label{eq:transmission_time}
+\end{equation}
+
+где $S$ — размер сообщения, $B$ — пропускная способность канала, RTT — round-trip time.
+
+Для gRPC время передачи меньше из-за меньшего размера:
+
+\begin{equation}
+T_{\text{gRPC}} = \frac{S_{\text{gRPC}}}{B} + \text{RTT} < T_{\text{REST}} = \frac{S_{\text{REST}}}{B} + \text{RTT}
+\label{eq:transmission_comparison}
+\end{equation}
+
+Event-driven архитектура использует асинхронную передачу событий. Пропускная способность:
+
+\begin{equation}
+\text{Throughput}_{\text{event}} = \frac{N_{\text{events}}}{T_{\text{processing}}} = \lambda_{\text{events}}
+\label{eq:event_throughput}
+\end{equation}
+
+где $N_{\text{events}}$ — количество событий, $T_{\text{processing}}$ — время обработки, $\lambda_{\text{events}}$ — интенсивность событий.
+
+\section{CQRS: проблема разделения операций чтения и записи}
+
+В традиционных системах операции чтения и записи используют одну модель данных, что создаёт конфликты при высокой нагрузке \cite{cqrs_pattern,event_sourcing}. Проблема заключается в том, что операции записи блокируют операции чтения.
+
+В архитектуре CQRS модели записи и чтения разделяются:
+
+\begin{equation}
+M_{\text{write}} \neq M_{\text{read}}, \quad M_{\text{write}} \cap M_{\text{read}} = \emptyset
+\label{eq:cqrs_separation}
+\end{equation}
+
+где $M_{\text{write}}$ — модель записи, $M_{\text{read}}$ — модель чтения.
+
+Синхронизация моделей через события:
+
+\begin{equation}
+M_{\text{read}}(t+\Delta t) = \text{Apply}(M_{\text{read}}(t), E(t, t+\Delta t))
+\label{eq:cqrs_sync}
+\end{equation}
+
+где $E(t, t+\Delta t)$ — события в интервале $[t, t+\Delta t]$, $\text{Apply}$ — функция применения событий.
+
+Задержка синхронизации (eventual consistency):
+
+\begin{equation}
+\Delta t_{\text{sync}} = t_{\text{read}} - t_{\text{write}}
+\label{eq:sync_delay}
+\end{equation}
+
+где $t_{\text{write}}$ — время записи в модель записи, $t_{\text{read}}$ — время появления данных в модели чтения.
+
+Пропускная способность записи:
+
+\begin{equation}
+\text{Throughput}_{\text{write}} = \frac{1}{T_{\text{write}}}
+\label{eq:write_throughput}
+\end{equation}
+
+Пропускная способность чтения:
+
+\begin{equation}
+\text{Throughput}_{\text{read}} = \frac{N_{\text{replicas}}}{T_{\text{read}}}
+\label{eq:read_throughput}
+\end{equation}
+
+где $N_{\text{replicas}}$ — количество реплик модели чтения.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm]
+    \node[rectangle, draw, fill=blue!20] (command) {Command Model};
+    \node[rectangle, draw, fill=green!20, right=of command] (query) {Query Model};
+    \node[rectangle, draw, fill=yellow!20, below=of command] (write_db) {Write DB};
+    \node[rectangle, draw, fill=yellow!20, below=of query] (read_db) {Read DB};
+    
+    \draw[->] (command) -- (write_db);
+    \draw[->] (query) -- (read_db);
+    \draw[->, dashed] (write_db) -- node[right] {Events} (read_db);
+\end{tikzpicture}
+\caption{Архитектура CQRS с разделением моделей записи и чтения \cite{richardson_microservices_patterns,newman_microservices}}
+\label{fig:cqrs_architecture}
+\end{figure}
+
+\section{Идемпотентность: проблема повторного выполнения операций}
+
+В распределённых системах операции могут выполняться повторно из-за сетевых ошибок или таймаутов \cite{kleppmann_designing_data}. Проблема заключается в том, что повторное выполнение не должно приводить к нежелательным побочным эффектам.
+
+Операция $f: X \to X$ называется идемпотентной, если выполняется условие:
+
+\begin{equation}
+f(f(x)) = f(x) \quad \forall x \in X
+\label{eq:idempotency}
+\end{equation}
+
+Более общее определение для операций с побочными эффектами:
+
+\begin{equation}
+\text{State}(f(f(x))) = \text{State}(f(x))
+\label{eq:idempotency_state}
+\end{equation}
+
+где $\text{State}$ — функция, возвращающая состояние системы после выполнения операции.
+
+Идемпотентность через уникальные идентификаторы:
+
+\begin{equation}
+f(x, \text{id}) = \begin{cases}
+\text{execute}(x) & \text{если } \text{id} \notin \text{executed} \\
+\text{skip} & \text{если } \text{id} \in \text{executed}
+\end{cases}
+\label{eq:idempotency_id}
+\end{equation}
+
+Вероятность повторного выполнения при сетевых ошибках:
+
+\begin{equation}
+P(\text{retry}) = 1 - (1 - p_{\text{error}})^n
+\label{eq:retry_probability}
+\end{equation}
+
+где $p_{\text{error}}$ — вероятность ошибки при одном запросе, $n$ — количество попыток.
+
+Для обеспечения идемпотентности необходимо хранить множество выполненных операций:
+
+\begin{equation}
+\text{Executed} = \{\text{id}_1, \text{id}_2, \ldots, \text{id}_k\}
+\label{eq:executed_set}
+\end{equation}
+
+Проверка идемпотентности:
+
+\begin{equation}
+\text{IsIdempotent}(\text{id}) = \begin{cases}
+\text{true} & \text{если } \text{id} \in \text{Executed} \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:idempotency_check}
+\end{equation}
+
+\section{Паттерны устойчивости: проблема каскадных отказов}
+
+Каскадные отказы возникают, когда отказ одного компонента вызывает отказы других компонентов \cite{circuit_breaker_pattern,retry_pattern}. Проблема заключается в распространении отказов по графу зависимостей.
+
+В паттерне Circuit Breaker состояние определяется как
+\[
+  \text{State} \in \{\text{CLOSED}, \text{OPEN}, \text{HALF\_OPEN}\}.
+\]
+
+Вероятность перехода в состояние OPEN при количестве ошибок $k$:
+
+\begin{equation}
+P(\text{OPEN}|k) = \begin{cases}
+1 & \text{если } k \geq \theta_{\text{failure}} \\
+0 & \text{иначе}
+\end{cases}
+\label{eq:circuit_breaker_open}
+\end{equation}
+
+где $\theta_{\text{failure}}$ — порог количества ошибок.
+
+Вероятность успешного запроса в состоянии HALF\_OPEN:
+
+\begin{equation}
+P(\text{CLOSED}|\text{HALF\_OPEN}) = \begin{cases}
+1 & \text{если } \text{success\_count} \geq \theta_{\text{success}} \\
+0 & \text{иначе}
+\end{cases}
+\label{eq:circuit_breaker_close}
+\end{equation}
+
+Время в состоянии OPEN:
+
+\begin{equation}
+T_{\text{OPEN}} = T_{\text{base}} \cdot 2^{\text{failure\_count}}
+\label{eq:circuit_breaker_timeout}
+\end{equation}
+
+где $T_{\text{base}}$ — базовое время ожидания, используется экспоненциальная задержка.
+
+При использовании retry с экспоненциальной задержкой время задержки перед $i$-й попыткой определяется следующим образом:
+
+\begin{equation}
+T_{\text{delay},i} = T_{\text{base}} \cdot 2^{i-1} + \text{random}(0, T_{\text{jitter}})
+\label{eq:exponential_backoff}
+\end{equation}
+
+где $T_{\text{jitter}}$ — случайная добавка для предотвращения синхронизации запросов.
+
+Вероятность успеха после $n$ попыток:
+
+\begin{equation}
+P(\text{success}|n) = 1 - (1 - p_{\text{success}})^n
+\label{eq:retry_success}
+\end{equation}
+
+где $p_{\text{success}}$ — вероятность успеха при одной попытке.
+
+Ожидаемое время выполнения с retry:
+
+\begin{equation}
+\mathbb{E}[T_{\text{total}}] = T_{\text{request}} + \sum_{i=1}^{n} P(\text{failure}|i-1) \cdot T_{\text{delay},i}
+\label{eq:retry_expected_time}
+\end{equation}
+
+При использовании timeout вероятность превышения таймаута определяется как:
+
+\begin{equation}
+P(T > T_{\text{timeout}}) = \int_{T_{\text{timeout}}}^{\infty} f_T(t) dt
+\label{eq:timeout_probability}
+\end{equation}
+
+где $f_T(t)$ — функция плотности вероятности времени выполнения операции.
+
+Оптимальный таймаут минимизирует сумму времени ожидания и времени обработки ошибок:
+
+\begin{equation}
+T_{\text{timeout}}^* = \arg\min_{T} \left[ T \cdot P(T_{\text{response}} \leq T) + T_{\text{error}} \cdot P(T_{\text{response}} > T) \right]
+\label{eq:optimal_timeout}
+\end{equation}
+
+где $T_{\text{error}}$ — время обработки ошибки таймаута.
+
+Паттерн Bulkhead обеспечивает изоляцию ресурсов через разделение на изолированные пулы:
+
+\begin{equation}
+R = \bigcup_{i=1}^{k} R_i, \quad R_i \cap R_j = \emptyset \text{ для } i \neq j
+\label{eq:resource_pools}
+\end{equation}
+
+где $R$ — общий набор ресурсов, $R_i$ — изолированный пул $i$.
+
+Использование ресурсов в пуле $i$:
+
+\begin{equation}
+U_i = \frac{\lambda_i}{\mu_i}
+\label{eq:pool_utilization}
+\end{equation}
+
+где $\lambda_i$ — интенсивность запросов к пулу $i$, $\mu_i$ — интенсивность обслуживания пула $i$.
+
+Изоляция предотвращает распространение перегрузки:
+
+\begin{equation}
+\text{Overload}(R_i) \not\Rightarrow \text{Overload}(R_j) \text{ для } i \neq j
+\label{eq:isolation_property}
+\end{equation}
+
+\section{Консистентность данных: проблема согласованности реплик}
+
+В распределённых системах данные реплицируются для повышения доступности. Проблема заключается в обеспечении согласованности между репликами.
+
+При строгой консистентности все реплики должны иметь одинаковое значение в каждый момент времени:
+
+\begin{equation}
+\forall i, j: v_i(t) = v_j(t)
+\label{eq:strong_consistency}
+\end{equation}
+
+где $v_i(t)$ — значение в реплике $i$ в момент времени $t$.
+
+Время синхронизации реплик:
+
+\begin{equation}
+T_{\text{sync}} = \max_{i,j} d(v_i, v_j) + T_{\text{propagation}}
+\label{eq:sync_time}
+\end{equation}
+
+где $d(v_i, v_j)$ — задержка передачи между репликами, $T_{\text{propagation}}$ — время распространения обновления.
+
+При eventual consistency консистентность достигается асимптотически:
+
+\begin{equation}
+\lim_{t \to \infty} P(v_i(t) = v_j(t)) = 1
+\label{eq:eventual_consistency}
+\end{equation}
+
+Время конвергенции к консистентности:
+
+\begin{equation}
+T_{\text{convergence}} = \inf\{t : P(v_i(t) = v_j(t)) > 1 - \epsilon\}
+\label{eq:convergence_time}
+\end{equation}
+
+где $\epsilon$ — допустимая погрешность.
+
+Векторные часы для отслеживания причинно-следственных связей \cite{lamport_distributed_systems,lynch_distributed_algorithms}:
+
+\begin{equation}
+VC_i = [t_1, t_2, \ldots, t_n]
+\label{eq:vector_clock}
+\end{equation}
+
+где $t_j$ — логическое время события в узле $j$, видимое узлом $i$.
+
+Отношение "произошло до" (happened-before):
+
+\begin{align}
+e_1 \to e_2
+  &\Leftrightarrow VC(e_1) < VC(e_2) \nonumber \\
+  &\Leftrightarrow
+    \left(
+      \forall i: VC_i(e_1) \leq VC_i(e_2)
+    \right)
+    \land
+    \left(
+      \exists j: VC_j(e_1) < VC_j(e_2)
+    \right)
+\label{eq:happened_before}
+\end{align}
+
+Рассмотренные архитектурные решения backend-уровня задают компромиссы между задержкой, пропускной способностью, согласованностью данных и устойчивостью к отказам. Асинхронные очереди сообщений и event-driven взаимодействие перераспределяют нагрузку и повышают использование ресурсов по сравнению с синхронными цепочками; модели очередей M/M/1 задают условия стабильности и предельной пропускной способности.
+
+Разделение контуров чтения и записи (CQRS), идемпотентные интерфейсы и паттерны устойчивости (circuit breaker, retry, bulkhead) формализуют ограничение каскадных отказов и управление повторными запросами. Репликация и уровни консистентности определяют допустимые траектории эволюции данных и переход между строгой и eventual consistency по времени синхронизации и вероятности расхождений.
+
+В дальнейших главах эти соотношения используются как эксплуатационные и архитектурные ограничения при проектировании автономных агентов и системы самовосстановления: алгоритмы диагностики и восстановления опираются на описанные паттерны взаимодействия сервисов, свойства протоколов и характеристики репликации при выборе безопасных и эффективных действий.

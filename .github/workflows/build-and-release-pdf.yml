@@ -1,0 +1,39 @@
+name: Build and release PDF
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up LaTeX and build PDF
+        uses: xu-cheng/latex-action@v2
+        with:
+          root_file: main.tex
+          working_directory: .
+          latexmk_use_biber: true
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dissertation-pdf
+          path: main.pdf
+
+      - name: Create GitHub Release with PDF
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: pdf-${{ github.sha }}
+          name: PDF build ${{ github.sha }}
+          draft: false
+          prerelease: true
+          files: |
+            main.pdf
+
+

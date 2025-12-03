@@ -1,0 +1,77 @@
+\chapter{Примеры логов и сценарии инцидентов}
+
+\section{Примеры структурированных логов}
+
+\subsection{Нормальное состояние}
+
+\begin{lstlisting}[caption={Пример структурированного лога: нормальное состояние}, label=lst:log_normal]
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "INFO",
+  "service": "order-service",
+  "message": "Order processed successfully",
+  "order_id": "12345",
+  "duration_ms": 45,
+  "trace_id": "abc123def456"
+}
+\end{lstlisting}
+
+\subsection{Аномальное состояние}
+
+\begin{lstlisting}[caption={Пример структурированного лога: аномальное состояние}, label=lst:log_error]
+{
+  "timestamp": "2024-01-15T10:35:00Z",
+  "level": "ERROR",
+  "service": "order-service",
+  "message": "Failed to connect to payment service",
+  "error": "Connection timeout after 5s",
+  "retry_count": 3,
+  "trace_id": "abc123def456"
+}
+\end{lstlisting}
+
+\section{Сценарии инцидентов}
+
+\subsection{Сценарий 1: Высокая загрузка CPU}
+
+\textbf{Симптомы:}
+\begin{itemize}
+    \item CPU usage > 90\% в течение 5 минут
+    \item Увеличение latency запросов
+    \item Увеличение ошибок 5xx
+\end{itemize}
+
+\textbf{Диагностика:}
+\begin{itemize}
+    \item Анализ метрик показывает недостаточное количество реплик
+    \item Логи показывают увеличение времени обработки запросов
+\end{itemize}
+
+\textbf{Действие восстановления:}
+\begin{itemize}
+    \item Автоматическое масштабирование сервиса (увеличение реплик с 3 до 5)
+    \item Мониторинг снижения нагрузки
+\end{itemize}
+
+\subsection{Сценарий 2: Каскадный отказ}
+
+\textbf{Симптомы:}
+\begin{itemize}
+    \item Отказ основного сервиса
+    \item Перегрузка зависимых сервисов
+    \item Распространение ошибок по системе
+\end{itemize}
+
+\textbf{Диагностика:}
+\begin{itemize}
+    \item Построение причинно-следственного графа показывает цепочку зависимостей
+    \item Определение корневой причины — отказ базы данных
+\end{itemize}
+
+\textbf{Действие восстановления:}
+\begin{itemize}
+    \item Включение circuit breaker для изоляции проблемного сервиса
+    \item Переключение на резервную базу данных
+    \item Постепенное восстановление соединений
+\end{itemize}
+

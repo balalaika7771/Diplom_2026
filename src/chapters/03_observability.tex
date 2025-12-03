@@ -1,0 +1,349 @@
+\chapter{Observability как фундамент диагностики}
+
+\section{Введение: что такое наблюдаемость}
+
+Наблюдаемость системы в инженерном смысле определяется как способность по доступным выходным данным восстановить или достаточно точно оценить её внутреннее состояние \cite{charity_majors_observability,observability_three_pillars}. В распределённых вычислительных системах внутренняя динамика задаётся взаимодействием множества компонентов, развёрнутых на разных узлах, при этом полный снимок состояния недоступен; анализ опирается на агрегированные и частичные представления в виде метрик, логов и трейсов.
+
+В отличие от классического мониторинга, ориентированного на набор пороговых метрик и статических алертов, наблюдаемость предполагает возможность по собранным данным реконструировать цепочку событий, локализовать источник отклонения и установить причинно-следственные связи между компонентами \cite{three_pillars,observability_vs_monitoring}. Пороговые правила (например, превышение загрузки процессора выше 80\%) фиксируют факт аномального состояния, но без дополнительной структуры данных не позволяют установить механизм его возникновения и связь с остальными частями системы.
+
+\section{Проблема понимания внутреннего состояния системы}
+
+Основная проблема заключается в том, что внутреннее состояние системы не наблюдаемо напрямую — доступны только внешние выходные данные. Чтобы понять, что происходит внутри системы, необходимо собирать и анализировать различные типы данных, которые отражают разные аспекты работы системы.
+
+Формально система называется наблюдаемой, если по выходным данным $y(t)$ можно однозначно определить внутреннее состояние $x(t)$. Для линейной системы это условие формулируется следующим образом:
+
+\begin{equation}
+\dot{x}(t) = A x(t) + B u(t), \quad y(t) = C x(t)
+\label{eq:linear_system}
+\end{equation}
+
+где $x(t) \in \mathbb{R}^n$ — вектор состояния, $u(t) \in \mathbb{R}^m$ — входной сигнал, $y(t) \in \mathbb{R}^p$ — выходной сигнал, $A, B, C$ — матрицы системы.
+
+Система наблюдаема, если матрица наблюдаемости имеет полный ранг:
+
+\begin{equation}
+\text{rank}(\mathcal{O}) = \text{rank}\begin{bmatrix}
+C \\
+CA \\
+CA^2 \\
+\vdots \\
+CA^{n-1}
+\end{bmatrix} = n
+\label{eq:observability_matrix}
+\end{equation}
+
+Для нелинейных распределённых систем наблюдаемость определяется через информационное содержание выходных данных.
+
+\section{Три столпа наблюдаемости}
+
+Наблюдаемость распределённой системы обеспечивается тремя типами данных: метриками, логами и трейсами.
+
+Обозначим пространство состояний системы как $\mathcal{X}$. Метрики $M(t)$ представляют проекцию состояния на числовую ось:
+
+\begin{equation}
+M(t) = \pi_M(x(t)) \in \mathbb{R}
+\label{eq:metrics_projection}
+\end{equation}
+
+где $\pi_M: \mathcal{X} \to \mathbb{R}$ — проекция состояния на метрику.
+
+Логи $L(t)$ представляют последовательность событий:
+
+\begin{equation}
+L(t) = \{l_1, l_2, \ldots, l_k\}, \quad l_i = (t_i, \text{event}_i, \text{context}_i)
+\label{eq:logs_sequence}
+\end{equation}
+
+где $t_i$ — временная метка, $\text{event}_i$ — тип события, $\text{context}_i$ — контекст события.
+
+Трейсы $T(t)$ представляют пути выполнения запросов \cite{distributed_tracing,distributed_tracing_survey}:
+
+\begin{equation}
+T(t) = \{s_1, s_2, \ldots, s_n\}, \quad s_i = (\text{service}_i, t_{\text{start},i}, t_{\text{end},i}, \text{parent}_i)
+\label{eq:traces_sequence}
+\end{equation}
+
+где $s_i$ — span (единица работы), $\text{parent}_i$ — родительский span.
+
+Функция наблюдаемости:
+
+\begin{equation}
+\text{Observability}(x(t)) = f(M(t), L(t), T(t))
+\label{eq:observability_function}
+\end{equation}
+
+\section{Метрики: проблема агрегации и потери информации}
+
+Метрики представляют агрегированные измерения состояния системы. Проблема заключается в потере детализации при агрегации.
+
+Метрику можно представить как случайную величину:
+
+\begin{equation}
+M(t) \sim \mathcal{D}(\theta(t))
+\label{eq:metric_distribution}
+\end{equation}
+
+где $\mathcal{D}$ — распределение метрики, $\theta(t)$ — параметры распределения, зависящие от времени.
+
+Типы метрик:
+
+Counter (счётчик) — монотонно возрастающая метрика:
+
+\begin{equation}
+C(t) = C(0) + \int_0^t \lambda(\tau) d\tau
+\label{eq:counter_metric}
+\end{equation}
+
+где $\lambda(t)$ — интенсивность событий.
+
+Gauge (измеритель) — метрика, которая может увеличиваться и уменьшаться:
+
+\begin{equation}
+G(t) = G(0) + \int_0^t \Delta G(\tau) d\tau
+\label{eq:gauge_metric}
+\end{equation}
+
+где $\Delta G(t)$ — скорость изменения метрики.
+
+Histogram — распределение значений:
+
+\begin{equation}
+H(t) = \{h_1(t), h_2(t), \ldots, h_k(t)\}, \quad \sum_{i=1}^{k} h_i(t) = N(t)
+\label{eq:histogram_metric}
+\end{equation}
+
+где $h_i(t)$ — количество значений в интервале $i$, $N(t)$ — общее количество измерений.
+
+Проблема агрегации: при усреднении теряется информация о распределении. Решение — использование процентилей:
+
+\begin{equation}
+P_p = \inf\{x : F(x) \geq p\}
+\label{eq:percentile}
+\end{equation}
+
+где $F(x)$ — эмпирическая функция распределения, $p \in [0,1]$ — уровень процентиля.
+
+Для latency важны процентили $P_{50}$ (медиана), $P_{95}$, $P_{99}$:
+
+\begin{equation}
+\text{Latency}_{\text{user}} \approx P_{95} \text{ или } P_{99}
+\label{eq:latency_percentile}
+\end{equation}
+
+\section{Логи: проблема структуризации и поиска}
+
+Логи представляют неструктурированные текстовые записи событий. Проблема заключается в сложности поиска релевантной информации в больших объёмах логов.
+
+Лог можно представить как последовательность токенов:
+
+\begin{equation}
+L = \{w_1, w_2, \ldots, w_n\}, \quad w_i \in \mathcal{V}
+\label{eq:log_tokens}
+\end{equation}
+
+где $\mathcal{V}$ — словарь токенов.
+
+Вероятностная модель лога:
+
+\begin{equation}
+P(L) = \prod_{i=1}^{n} P(w_i | w_{i-1}, \ldots, w_{i-k})
+\label{eq:log_probability}
+\end{equation}
+
+где $k$ — порядок модели (для $k=1$ получаем модель биграмм).
+
+Структурированные логи в формате JSON упрощают анализ:
+
+\begin{lstlisting}[caption={Пример структурированного лога},label=lst:structured_log_example]
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "ERROR",
+  "service": "order-service",
+  "message": "Failed to process order",
+  "trace_id": "abc123",
+  "error": "Connection timeout"
+}
+\end{lstlisting}
+
+Структурированный лог представляется следующим образом:
+
+\begin{equation}
+L_{\text{structured}} = \{f_1: v_1, f_2: v_2, \ldots, f_n: v_n\}
+\label{eq:structured_log}
+\end{equation}
+
+где $f_i$ — поле, $v_i$ — значение поля.
+
+Поиск в логах формулируется как задача информационного поиска \cite{hastie_elements,murphy_machine_learning}:
+
+\begin{equation}
+\text{Relevance}(L, q) = \sum_{f \in L} \text{TF-IDF}(f, q) \cdot w_f
+\label{eq:log_search}
+\end{equation}
+
+где $\text{TF-IDF}(f, q)$ — TF-IDF вес поля $f$ относительно запроса $q$, $w_f$ — вес поля.
+
+\section{Трейсы: проблема построения причинно-следственных связей}
+
+Distributed tracing позволяет отслеживать путь запроса через систему \cite{distributed_tracing,distributed_tracing_survey}. Каждый запрос проходит через множество сервисов, и для понимания причин проблем необходимо определить, какие сервисы участвуют в обработке запроса и как они взаимодействуют друг с другом. Проблема заключается в построении причинно-следственных связей между spans.
+
+Трейс представляется как дерево spans:
+
+\begin{equation}
+T = (V_T, E_T), \quad V_T = \{s_1, s_2, \ldots, s_n\}
+\label{eq:trace_tree}
+\end{equation}
+
+где $V_T$ — множество spans, $E_T$ — множество рёбер (отношение родитель-потомок).
+
+Span $s_i$ характеризуется кортежем:
+
+\begin{equation}
+s_i = (\text{service}_i, t_{\text{start},i}, t_{\text{end},i}, \text{duration}_i, \text{status}_i, \text{parent}_i)
+\label{eq:span_tuple}
+\end{equation}
+
+Длительность span:
+
+\begin{equation}
+\text{duration}_i = t_{\text{end},i} - t_{\text{start},i}
+\label{eq:span_duration}
+\end{equation}
+
+Общая длительность запроса:
+
+\begin{equation}
+\text{total\_duration} = \max_{s_i \in \text{leaves}(T)} t_{\text{end},i} - \min_{s_i \in \text{root}(T)} t_{\text{start},i}
+\label{eq:total_duration}
+\end{equation}
+
+Проблема: параллельное выполнение spans приводит к тому, что сумма длительностей дочерних spans может превышать длительность родительского span.
+
+Решение: анализ критического пути (critical path):
+
+\begin{equation}
+\text{critical\_path} = \arg\max_{\text{path} \in \text{paths}(T)} \sum_{s_i \in \text{path}} \text{duration}_i
+\label{eq:critical_path}
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.8cm, auto, scale=0.75, transform shape, font=\small]
+    \node[rectangle, draw, fill=blue!20, minimum width=1.5cm, minimum height=0.6cm] (span1) {API Gateway};
+    \node[rectangle, draw, fill=green!20, below=of span1, minimum width=1.5cm, minimum height=0.6cm] (span2) {Auth Service};
+    \node[rectangle, draw, fill=green!20, below left=of span2, minimum width=1.5cm, minimum height=0.6cm] (span3) {Order Service};
+    \node[rectangle, draw, fill=green!20, below right=of span2, minimum width=1.5cm, minimum height=0.6cm] (span4) {Payment Service};
+    
+    \draw[->, shorten >=2pt, shorten <=2pt] (span1) -- (span2);
+    \draw[->, shorten >=2pt, shorten <=2pt] (span2) -- (span3);
+    \draw[->, shorten >=2pt, shorten <=2pt] (span2) -- (span4);
+\end{tikzpicture}
+\caption{Структура трейса запроса как дерева spans \cite{distributed_tracing,opentelemetry_docs}}
+\label{fig:trace_structure}
+\end{figure}
+
+\section{Причинно-следственные графы: проблема определения корневой причины}
+
+Причинно-следственный граф строится на основе анализа метрик, логов и трейсов для определения корневой причины инцидента. Граф определяется следующим образом:
+
+\begin{equation}
+G_{\text{causal}} = (V, E), \quad V = \{\text{events}, \text{metrics}, \text{services}\}, \quad E = \{\text{causal relations}\}
+\label{eq:causal_graph}
+\end{equation}
+
+Вероятность причинно-следственной связи между событиями $e_i$ и $e_j$:
+
+\begin{equation}
+P(e_i \to e_j | \mathbf{m}, \mathbf{l}, \mathbf{t}) = \sigma\left(\sum_{k} w_k \cdot f_k(e_i, e_j, \mathbf{m}, \mathbf{l}, \mathbf{t})\right)
+\label{eq:causal_probability}
+\end{equation}
+
+где $f_k$ — функции признаков (временная близость, корреляция, зависимость в трейсе), $w_k$ — веса признаков, $\sigma(x) = \frac{1}{1+e^{-x}}$ — сигмоидальная функция.
+
+Временная задержка между событиями:
+
+\begin{equation}
+\tau(e_i, e_j) = \arg\max_{\Delta t} \text{corr}(e_i(t), e_j(t + \Delta t))
+\label{eq:temporal_delay}
+\end{equation}
+
+Корреляция между событиями:
+
+\begin{equation}
+\rho(e_i, e_j) = \frac{\text{cov}(e_i, e_j)}{\sqrt{\text{var}(e_i) \text{var}(e_j)}}
+\label{eq:event_correlation}
+\end{equation}
+
+Критерий причинности (Granger causality) \cite{distributed_tracing_survey}:
+
+\begin{equation}
+e_j \text{ causes } e_i \Leftrightarrow \text{var}(\epsilon_{i|e_j}) < \text{var}(\epsilon_{i|\neg e_j})
+\label{eq:granger_causality}
+\end{equation}
+
+где $\epsilon_{i|e_j}$ — ошибка предсказания $e_i$ с учётом $e_j$, $\epsilon_{i|\neg e_j}$ — без учёта $e_j$.
+
+Поиск корневой причины:
+
+\begin{equation}
+\text{RootCause} =
+  \arg\min_{v \in V}
+    \text{in-degree}(v)
+    \quad \text{при условиях}
+\end{equation}
+\begin{equation}
+  \text{out-degree}(v) > 0,
+  \quad
+  P(\text{anomaly} \mid v) > \theta
+\label{eq:root_cause_search}
+\end{equation}
+
+где $\text{in-degree}(v)$ — количество входящих рёбер (причин), $\text{out-degree}(v)$ — количество исходящих рёбер (следствий), $P(\text{anomaly}|v)$ — вероятность аномалии в узле $v$.
+
+\section{Ограничения современных стеков: проблема масштабирования}
+
+Современные стеки наблюдаемости имеют ограничения по масштабированию и интеграции данных.
+
+Проблема Prometheus (pull-модель): сборщик должен знать обо всех источниках метрик \cite{prometheus_paper,prometheus_docs}. При росте количества источников $N$ сложность управления растёт как $O(N)$.
+
+В pull-модели время сбора данных определяется следующим образом:
+
+\begin{equation}
+T_{\text{collection}} = \sum_{i=1}^{N} T_{\text{poll},i} + T_{\text{network},i}
+\label{eq:prometheus_collection}
+\end{equation}
+
+где $T_{\text{poll},i}$ — время опроса источника $i$, $T_{\text{network},i}$ — сетевая задержка.
+
+Проблема хранения: объём данных растёт экспоненциально:
+
+\begin{equation}
+V(t) = V_0 \cdot e^{\lambda t}
+\label{eq:storage_growth}
+\end{equation}
+
+где $V_0$ — начальный объём, $\lambda$ — скорость роста.
+
+Решение: downsampling (понижение частоты дискретизации):
+
+\begin{equation}
+M_{\text{downsampled}}(t) = \frac{1}{k} \sum_{i=0}^{k-1} M(t - i \cdot \Delta t)
+\label{eq:downsampling}
+\end{equation}
+
+где $k$ — коэффициент понижения частоты, $\Delta t$ — интервал дискретизации.
+
+Проблема интеграции данных: метрики, логи и трейсы хранятся в разных системах. Необходима единая модель данных:
+
+\begin{equation}
+\text{UnifiedModel}(t) = \text{Join}(\text{Metrics}(t), \text{Logs}(t), \text{Traces}(t), \text{key} = \text{trace\_id})
+\label{eq:unified_model}
+\end{equation}
+
+Понимание внутреннего состояния распределённых систем формализуется через наблюдаемость: состояние недоступно напрямую, и его оценка возможна только по совокупности внешних данных. Для линейных систем это выражается в ранговом условии на матрицу наблюдаемости, для распределённых производственных систем — в достаточности информации, содержащейся в метриках, логах и трейcах.
+
+Метрики, логи и трейсы задают взаимодополняющие представления поведения системы: метрики — численные нагрузки и ошибки, логи — события с контекстом, трейсы — структуру распределённого исполнения запросов и критические пути. Их формализация через распределения, последовательности токенов и деревья spans образует основу автоматического анализа.
+
+Построение причинно-следственных графов на этих данных позволяет переходить от симптомов к корневой причине инцидента с использованием временных зависимостей, корреляций и критериев причинности. Ограничения существующих стеков наблюдаемости (масштабируемость, раздельное хранение, сложная интеграция) делают ручной анализ малоэффективным и мотивируют разработку интеллектуальных систем диагностики и самовосстановления.
+
+Последующие главы опираются на введённые здесь представления о наблюдаемости и причинно-следственных связях при построении алгоритмов обнаружения аномалий, прогнозирования деградации и архитектур автономных агентов, использующих данные наблюдаемости как основное основание для принятия решений.

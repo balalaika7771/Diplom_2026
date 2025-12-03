@@ -1,40 +1,43 @@
-\chapter{Исходный код программы}
+\chapter{Схемы архитектуры системы}
 
-\section{Основной модуль}
+\section{Детальная архитектура модулей}
 
-\begin{lstlisting}[language=Python, caption={Основной модуль программы}]
-def main():
-    """Main function of the program."""
-    print("Hello, World!")
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm, scale=0.9]
+    \node[rectangle, draw, fill=blue!20, minimum width=3cm, minimum height=1.5cm] (collector) {Data Collector};
+    \node[rectangle, draw, fill=green!20, minimum width=3cm, minimum height=1.5cm, right=of collector] (analyzer) {Anomaly Analyzer};
+    \node[rectangle, draw, fill=yellow!20, minimum width=3cm, minimum height=1.5cm, below=of analyzer] (diagnostic) {Diagnostic Engine};
+    \node[rectangle, draw, fill=red!20, minimum width=3cm, minimum height=1.5cm, left=of diagnostic] (orchestrator) {Orchestrator};
+    \node[rectangle, draw, fill=orange!20, minimum width=3cm, minimum height=1.5cm, below=of orchestrator] (executor) {Safe Executor};
     
-    # Initialization
-    data = load_data()
-    
-    # Data processing
-    result = process_data(data)
-    
-    # Output results
-    print(f"Result: {result}")
+    \draw[->, thick] (collector) -- node[above] {Metrics} (analyzer);
+    \draw[->, thick] (analyzer) -- node[right] {Anomalies} (diagnostic);
+    \draw[->, thick] (diagnostic) -- node[above] {Root Cause} (orchestrator);
+    \draw[->, thick] (orchestrator) -- node[right] {Actions} (executor);
+    \draw[->, thick, dashed] (executor) -- node[left] {Feedback} (collector);
+\end{tikzpicture}
+\caption{Детальная схема взаимодействия модулей системы}
+\label{fig:appendix_detailed_architecture}
+\end{figure}
 
-if __name__ == "__main__":
-    main()
-\end{lstlisting}
+\section{Схема потока данных}
 
-\section{Модуль обработки данных}
-
-\begin{lstlisting}[language=Python, caption={Модуль обработки данных}]
-def process_data(data):
-    """Process input data."""
-    processed = []
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.5cm]
+    \node[rectangle, draw, fill=blue!20] (prometheus) {Prometheus};
+    \node[rectangle, draw, fill=blue!20, below=of prometheus] (elk) {ELK Stack};
+    \node[rectangle, draw, fill=blue!20, below=of elk] (jaeger) {Jaeger};
     
-    for item in data:
-        # Process each element
-        processed_item = transform(item)
-        processed.append(processed_item)
+    \node[rectangle, draw, fill=green!20, right=3cm of prometheus] (collector) {Data Collector};
+    \node[rectangle, draw, fill=yellow!20, right=of collector] (storage) {Time Series DB};
     
-    return processed
-
-def transform(item):
-    """Transform data element."""
-    return item * 2
-\end{lstlisting}
+    \draw[->] (prometheus) -- (collector);
+    \draw[->] (elk) -- (collector);
+    \draw[->] (jaeger) -- (collector);
+    \draw[->] (collector) -- (storage);
+\end{tikzpicture}
+\caption{Схема потока данных от источников к хранилищу}
+\label{fig:appendix_data_flow}
+\end{figure}

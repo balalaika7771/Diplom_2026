@@ -75,6 +75,11 @@
 }
 
 % Настройки нумерации по ГОСТу 7.32-2017
+% Глобальная нумерация рисунков и таблиц по всей диссертации
+\makeatletter
+\@removefromreset{figure}{chapter}
+\@removefromreset{table}{chapter}
+\makeatother
 \renewcommand{\thefigure}{\arabic{figure}}
 \renewcommand{\thetable}{\arabic{table}}
 \renewcommand{\theequation}{\arabic{equation}}
@@ -130,6 +135,10 @@
 \makeatletter
 \def\verbatim@font{\ttfamily\small}
 \makeatother
+
+% Окружение для форматированного verbatim с рамкой
+\usepackage{fancyvrb}
+\DefineVerbatimEnvironment{codeverbatim}{Verbatim}{frame=single, framesep=2mm, fontsize=\small, numbers=left, numbersep=3pt}
 
 % Настройки для листингов кода (единый стиль)
 \lstset{

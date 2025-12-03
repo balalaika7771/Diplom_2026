@@ -1,0 +1,973 @@
+\chapter{Реализация прототипа}
+
+\section{Цели и сценарии использования прототипа}
+
+Прототип реализует архитектуру системы интеллектуальных агентов, сформулированную в главе~8, в виде работающего программного комплекса. Его назначение — показать, что предложенные алгоритмы обнаружения аномалий, диагностики, оркестрации и безопасного исполнения могут быть внедрены в типичный стек наблюдаемости и эксплуатации распределённых систем и использоваться для сокращения времени восстановления после инцидентов.
+
+В терминах гипотезы (\ref{eq:hypothesis_ineq}) прототип служит инструментом проверки неравенства для реальной системы: он должен обеспечить уменьшение среднего времени восстановления \(\text{MTTR}\) и улучшение эксплуатационных метрик точности, полноты и доли ложных срабатываний, определённых во введении (\ref{eq:mttr})–(\ref{eq:fpr}). Через него измеряются целевые улучшения \(I_m\) для метрик \(m \in \{\text{MTTR}, \text{precision}, \text{false\_positive\_rate}, \text{diagnosis\_time}\}\), задающие количественную сторону результата работы.
+
+Основные цели прототипа:
+\begin{itemize}
+  \item интегрировать модули сбора метрик, логов и трейсов с промышленными системами наблюдаемости (Prometheus, Elasticsearch, Jaeger);
+  \item реализовать связку Anomaly Detector~$\rightarrow$ Diagnostic Engine~$\rightarrow$ Orchestrator~$\rightarrow$ Safe Executor как единую цепочку обработки инцидента;
+  \item обеспечить возможность воспроизведения и анализа типовых сценариев инцидентов (рост нагрузки, ошибки соединений) в условиях, близких к production;
+  \item подготовить экспериментальную платформу для количественной оценки влияния системы агентов на MTTR и связанные метрики (глава~11).
+\end{itemize}
+
+Прототип ориентирован на кластеры Kubernetes с микросервисной архитектурой и использует реальные данные из производственной среды для валидации поведения агентов. В дальнейшем все экспериментальные сценарии опираются именно на этот экземпляр системы: структура модулей, используемый стек и конфигурация в явном виде задают те ограничения и допущения, в рамках которых интерпретируются результаты измерений.
+
+\section{Структура модулей: организация кода}
+
+Прототип реализован на Java с использованием Spring Boot, что обеспечивает модульную архитектуру и интеграцию компонентов \cite{spring_framework}. Каждый модуль соответствует одной или нескольким математическим моделям.
+
+Для оценки модульности системы рассмотрим её разбиение:
+
+Система разбита на модули: $M = \{M_1, M_2, \ldots, M_n\}$.
+
+Зависимости между модулями:
+
+\begin{equation}
+D(M_i, M_j) = \begin{cases}
+1 & \text{если } M_i \text{ зависит от } M_j \\
+0 & \text{иначе}
+\end{cases}
+\label{eq:module_dependency}
+\end{equation}
+
+Матрица зависимостей:
+
+\begin{equation}
+\mathbf{D}_{ij} = D(M_i, M_j)
+\label{eq:dependency_matrix}
+\end{equation}
+
+Условие отсутствия циклических зависимостей:
+
+\begin{equation}
+\forall k: (\mathbf{D}^k)_{ii} = 0 \text{ для всех } i
+\label{eq:acyclic_dependency}
+\end{equation}
+
+Архитектура прототипа следует принципу разделения ответственности: модули \texttt{agents} (AnomalyDetectorService, DiagnosticEngineService, RecoveryExecutorService), \texttt{data} (DataCollectorService, DataProcessorService), \texttt{orchestrator} (консенсус агентов), \texttt{models} (LstmModel, IsolationForestModel) реализуют соответствующие подсистемы. Конфигурация описана в \texttt{application.yml}, сборка — Maven. Каждая подсистема вынесена в отдельный пакет, что позволяет независимо развёртывать, тестировать и масштабировать функциональные блоки.
+
+\subsection{Модуль сбора и нормализации данных (\texttt{data})}
+
+Модуль \texttt{data} инкапсулирует интеграцию с внешними системами наблюдаемости: Prometheus (метрики), Elasticsearch (логи), Jaeger (трейсы). Сервис \texttt{DataCollectorService} реализует периодический и событийный опрос этих источников, приводя данные к унифицированному формату
+\[
+  d = (\text{timestamp}, \text{source}, \text{type}, \text{value}, \text{metadata}),
+\]
+совместимому с формальными представлениями метрик, логов и трейсов из главы~3. \texttt{DataProcessorService} выполняет агрегацию, фильтрацию и нормализацию данных (усреднение по окнам, downsampling, обогащение контекстом), подготавливая вход для модулей обнаружения аномалий и диагностики.
+
+\paragraph{Пример унификации метрик и логов.}
+
+Пусть Prometheus публикует метрику \texttt{http\_request\_duration\_seconds\{service="checkout",status="5xx"\}} со значением \(0.8\) с и временной меткой \(t\), а в Elasticsearch в тот же момент записан лог:
+\[
+  \text{service} = \text{``checkout''},\ \text{level} = \text{``ERROR''},\ \text{message} = \text{``timeout''},\ \text{trace\_id} = \tau.
+\]
+Collector преобразует их в записи
+\[
+  d_1 = (t, \text{``checkout''}, \text{metric}, 0.8, \{\text{status} = \text{``5xx''}\}),
+\]
+\[
+  d_2 = (t, \text{``checkout''}, \text{log}, \text{``ERROR''}, \{\text{message} = \text{``timeout''}, \text{trace\_id} = \tau\}),
+\]
+что позволяет далее связывать метрики и логи по полям \(\text{source}\) и \(\text{trace\_id}\) при построении диагностического графа.
+
+\subsection{Модуль обнаружения аномалий (\texttt{agents: AnomalyDetectorService})}
+
+Сервис \texttt{AnomalyDetectorService} реализует связку простых статистических критериев и LSTM-модели для потокового анализа временных рядов метрик. В коде поддерживаются:
+\begin{itemize}
+  \item пороговые правила (трёхсигма и Z-score) для быстрого детектирования грубых отклонений;
+  \item модели ARIMA для отдельных метрик с хорошо выраженной сезонностью;
+  \item многомерная LSTM-модель для прогнозирования деградации с горизонтом $\Delta t$, настроенным согласно главе~6.
+\end{itemize}
+Результатом работы модуля являются события вида \texttt{AnomalyEvent(service, metric, score, window)}, размещаемые в Kafka-топиках и передаваемые в Diagnostic Engine.
+
+\paragraph{Пример обнаружения аномалии по Z-score и LSTM-прогнозу.}
+
+Пусть для метрики latency сервиса \texttt{checkout} в окне из \(n = 60\) точек рассчитаны среднее \(\mu = 250\) мс и стандартное отклонение \(\sigma = 30\) мс. В момент времени \(t\) наблюдается значение \(\text{Latency}(t) = 360\) мс, тогда
+\[
+  Z(t) = \frac{\text{Latency}(t) - \mu}{\sigma} = \frac{360 - 250}{30} \approx 3.67 > \theta_Z = 3,
+\]
+что даёт срабатывание порогового правила. Одновременно LSTM-модель прогнозирует \(\hat{\text{Latency}}(t+\Delta t) = 380\) мс при пороге деградации \(\theta_{\text{degradation}} = 350\) мс, то есть \(\hat{\text{Latency}}(t+\Delta t) > \theta_{\text{degradation}}\). В этой ситуации \texttt{AnomalyDetectorService} формирует событие
+\[
+  \text{AnomalyEvent}(\text{service} = \text{``checkout''}, \text{metric} = \text{``latency''}, \text{score} \approx Z(t), \text{window} = [t-60, t]),
+\]
+которое передаётся в Diagnostic Engine и далее по цепочке агентов.
+
+\subsection{Модуль диагностического графа (\texttt{agents: DiagnosticEngineService})}
+
+Модуль \texttt{DiagnosticEngineService} строит причинно-следственный граф инцидента по совокупности метрик, логов и трейсов. Реализация опирается на библиотеку JGraphT: вершины графа соответствуют сервисам и отдельным типам событий, рёбра — вероятностным причинным связям, вычисляемым по признакам времени, корреляции и топологии трейсов. На основе формулы~(\ref{eq:root_cause_impl}) модуль ранжирует кандидатов на корневую причину и формирует структуру \texttt{DiagnosisReport}, содержащую:
+\begin{itemize}
+  \item идентификаторы сервисов и компонент, вовлечённых в инцидент;
+  \item оценки вероятности их вклада;
+  \item минимальные пути в графе от симптомов к предполагаемой причине.
+\end{itemize}
+
+\paragraph{Пример диагностического графа для инцидента оплаты.}
+
+Рассмотрим упрощённый инцидент: рост времени ответа эндпоинта \texttt{/checkout}. В трейсе Jaeger фиксируется цепочка вызовов
+\[
+  \text{API-Gateway} \rightarrow \text{CheckoutService} \rightarrow \text{PaymentService} \rightarrow \text{DB}.
+\]
+Из метрик известно, что \(\text{Latency}_{\text{CheckoutService}}\) и \(\text{Latency}_{\text{PaymentService}}\) выросли, а ошибки 5xx наблюдаются только на \texttt{PaymentService}. Диагностический модуль строит граф
+\[
+  V = \{\text{CheckoutService}, \text{PaymentService}, \text{DB}\}, \quad
+  E = \{(\text{CheckoutService} \to \text{PaymentService}), (\text{PaymentService} \to \text{DB})\},
+\]
+где веса рёбер задаются признаками
+\[
+  f_{\text{time}} = \exp\left(-\frac{|\Delta t|}{\tau}\right), \quad
+  f_{\text{corr}} = |\rho(\text{Latency}_i, \text{Latency}_j)|, \quad
+  f_{\text{trace}} = \mathbf{1}[\text{parent}(j) = i].
+\]
+Для пары \((\text{CheckoutService}, \text{PaymentService})\) получаем, например,
+\[
+  P(\text{CheckoutService} \to \text{PaymentService})
+    = \sigma\bigl(w_1 f_{\text{time}} + w_2 f_{\text{corr}} + w_3 f_{\text{trace}}\bigr) \approx 0.3,
+\]
+тогда как для пары \((\text{PaymentService}, \text{DB})\) из-за высокой корреляции задержек и топологии трейса
+\[
+  P(\text{PaymentService} \to \text{DB}) \approx 0.8.
+\]
+С учётом того, что ошибки 5xx фиксируются только на уровне \texttt{PaymentService}, алгоритм (\ref{eq:root_cause_impl}) выдаёт \(\text{RootCause} = \text{PaymentService}\), а \texttt{DiagnosisReport} содержит путь
+\[
+  \text{CheckoutService} \rightarrow \text{PaymentService}
+\]
+как основной маршрут распространения проблемы. В прототипе такая структура графа и вероятности формируются программно на основе реальных метрик и трейсов из кластера Kubernetes.
+
+\subsection{Модуль оркестрации и исполнения (\texttt{agents: Orchestrator, RecoveryExecutorService})}
+
+Модуль \texttt{orchestrator} реализует консенсус агентов и выбор действий восстановления. На вход он получает набор рекомендаций от Diagnostic Engine, LLM-агента и rule-based политик, а на выходе формирует план действий \texttt{RecoveryPlan} с приоритетами и уровнем доверия. \texttt{RecoveryExecutorService} преобразует план в конкретные операции над Kubernetes-кластером (масштабирование \texttt{Deployment}, изменение \texttt{ConfigMap}, включение/выключение circuit breaker в сервисах) через Kubernetes Client и дополнительные REST/gRPC-интерфейсы. Все действия проходят через модуль Safe Executor, реализующий критерии риска и механизмы отката.
+
+\paragraph{Пример согласования действий восстановления.}
+
+Пусть для инцидента с сервисом \texttt{payment} три источника дают разные рекомендации:
+\begin{itemize}
+  \item rule-based политика: \(a_1 =\) «увеличить число реплик \texttt{payment}»;
+  \item Diagnostic Engine: \(a_2 =\) «включить circuit breaker для зависимости \texttt{payments-db}»;
+  \item LLM-агент: \(a_3 =\) «переключить пул соединений на резервную базу».
+\end{itemize}
+Для каждого агента \(A_i\) рассчитаны мнения \(o_i(a)\) и веса \(w_i\) по формулам (\ref{eq:agent_opinion_impl})–(\ref{eq:agent_weight_impl}). Пусть, например,
+\[
+  \text{Decision} = \arg\max_{a \in \{a_1,a_2,a_3\}} \sum_{i=1}^{n} w_i \cdot o_i(a) = a_2.
+\]
+В этом случае Orchestrator формирует \texttt{RecoveryPlan} с основным действием «включить circuit breaker для \texttt{payments-db}» и дополнительной проверкой последствий. \texttt{RecoveryExecutorService} применяет изменение через Kubernetes Client, а модуль Safe Executor контролирует риск по (\ref{eq:risk_function_impl}) и, при необходимости, инициирует откат по (\ref{eq:rollback_impl}).
+
+\subsection{Модуль LLM Agent и интеграция с разработчиками}
+
+LLM-агент реализован как отдельный сервис, использующий Model Context Protocol для взаимодействия с внешними LLM-провайдерами. Он получает на вход структурированный контекст (\texttt{Metrics}, \texttt{Logs}, \texttt{Traces}, \texttt{CausalGraph}) и формирует:
+\begin{itemize}
+  \item текстовые объяснения инцидента для разработчиков;
+  \item гипотезы причин, не покрытые формальными моделями;
+  \item рекомендации по изменению конфигурации и кода.
+\end{itemize}
+Результат работы LLM-агента попадает как в оркестратор (для учёта при выборе действий), так и в человеко-читаемые каналы (Slack/почта), что обеспечивает связку автоматического и ручного управления инцидентами.
+
+\paragraph{Пример объяснения инцидента на основе логов и метрик.}
+
+Пусть в Elasticsearch зафиксирован лог
+\[
+  \text{service} = \text{``order-service''},\ \text{level} = \text{``ERROR''},\ \text{message} = \text{``Failed to connect to payment service''},
+\]
+а метрики показывают рост доли ошибок 5xx для \texttt{order-service} и \texttt{payment-service}. LLM-агент получает контекст
+\[
+  C_{\text{llm}} = \text{Aggregate}(\text{Metrics}(t-\Delta t, t), \text{Logs}(t-\Delta t, t), \text{Traces}(t-\Delta t, t), G_{\text{causal}})
+\]
+и формирует оценку
+\[
+  P(\text{problem} \mid \text{log}_i) = \text{LLM}(\text{log}_i, \text{prompt}_{\text{problem\_detection}}) \approx 0.9,
+\]
+после чего генерирует объяснение в виде текста:
+\[
+  \text{Explanation} = \text{LLM}(C_{\text{llm}}, \text{prompt}_{\text{explanation}}),
+\]
+содержащее:
+\begin{itemize}
+  \item описание проблемы («\texttt{order-service} не может подключиться к \texttt{payment-service} из-за таймаутов»);
+  \item вероятную корневую причину («перегрузка \texttt{payment-service} или недоступность его базы данных»);
+  \item предлагаемые действия («увеличить число реплик \texttt{payment-service}, проверить состояние базы данных, временно ограничить входящий трафик»).
+\end{itemize}
+Это объяснение отправляется разработчикам и одновременно учитывается Orchestrator'ом как одна из рекомендаций при выборе автоматических действий.
+
+\section{Технологический стек и архитектура прототипа}
+
+Прототип построен на стеке: Java Spring Boot, DeepLearning4j, JGraphT, Spring WebFlux, Kafka, Redis, InfluxDB, Elasticsearch, Kubernetes Client.
+
+Кластер развертывания включает:
+\begin{itemize}
+  \item Kubernetes-кластер с 10 сервисами бизнес-логики (имитируют микросервисное приложение);
+  \item подсистему наблюдаемости: Prometheus для метрик, Elasticsearch для логов, Jaeger для трейсов;
+  \item подсистему агентов: Collector, Detector, Diagnostic, Orchestrator, Executor, LLM Agent.
+\end{itemize}
+
+Сервисы агентов работают как отдельные \texttt{Deployment} в Kubernetes и взаимодействуют с остальной системой через:
+\begin{itemize}
+  \item Kafka-топики для передачи событий аномалий и диагнозов;
+  \item Redis как кэш для контекстной информации (актуальные метрики, результаты предыдущих диагнозов);
+  \item REST/gRPC-интерфейсы для вызова действий восстановления и получения рекомендаций.
+\end{itemize}
+
+Архитектура на рисунке~\ref{fig:prototype_architecture} отражает, как данные из Prometheus, Elasticsearch и Jaeger попадают в Collector, преобразуются в унифицированный контекст и далее по цепочке передаются в Detector, Diagnostic, Orchestrator и Executor. LLM-агент получает тот же контекст и результаты диагностики, что позволяет согласованно использовать как формальные модели, так и языковые модели при анализе инцидентов.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.8cm, auto, scale=0.75, transform shape, font=\small]
+    \node[rectangle, draw, fill=blue!20, minimum width=1.2cm, minimum height=0.6cm] (prometheus) {Prometheus};
+    \node[rectangle, draw, fill=green!20, below=of prometheus, minimum width=1.2cm, minimum height=0.6cm] (elasticsearch) {Elasticsearch};
+    \node[rectangle, draw, fill=yellow!20, below=of elasticsearch, minimum width=1.2cm, minimum height=0.6cm] (jaeger) {Jaeger};
+    \node[rectangle, draw, fill=red!20, right=of prometheus, xshift=1cm, minimum width=1.2cm, minimum height=0.6cm] (collector) {Collector};
+    \node[rectangle, draw, fill=orange!20, right=of collector, xshift=1cm, minimum width=1.2cm, minimum height=0.6cm] (detector) {Detector};
+    \node[rectangle, draw, fill=purple!20, below=of detector, minimum width=1.2cm, minimum height=0.6cm] (diagnostic) {Diagnostic};
+    \node[rectangle, draw, fill=cyan!20, below=of collector, minimum width=1.2cm, minimum height=0.6cm] (orchestrator) {Orchestrator};
+    \node[rectangle, draw, fill=pink!20, below=of orchestrator, minimum width=1.2cm, minimum height=0.6cm] (executor) {Executor};
+    \node[rectangle, draw, fill=brown!20, right=of diagnostic, xshift=1cm, minimum width=1.2cm, minimum height=0.6cm] (llm) {LLM};
+    
+    \draw[->, shorten >=2pt, shorten <=2pt] (prometheus) -- (collector);
+    \draw[->, shorten >=2pt, shorten <=2pt] (elasticsearch) -- (collector);
+    \draw[->, shorten >=2pt, shorten <=2pt] (jaeger) -- (collector);
+    \draw[->, shorten >=2pt, shorten <=2pt] (collector) -- (detector);
+    \draw[->, shorten >=2pt, shorten <=2pt] (detector) -- (diagnostic);
+    \draw[->, shorten >=2pt, shorten <=2pt] (diagnostic) -- (orchestrator);
+    \draw[->, shorten >=2pt, shorten <=2pt] (orchestrator) -- (executor);
+    \draw[->, shorten >=2pt, shorten <=2pt] (diagnostic) -- (llm);
+    \draw[->, shorten >=2pt, shorten <=2pt] (llm) -- (orchestrator);
+\end{tikzpicture}
+\caption{Архитектура прототипа}
+\label{fig:prototype_architecture}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.8cm, auto, scale=0.75, transform shape, font=\small]
+    \node[rectangle, draw, fill=blue!20, minimum width=1cm, minimum height=0.6cm] (kafka) {Kafka};
+    \node[rectangle, draw, fill=green!20, above left=of kafka, minimum width=1cm, minimum height=0.6cm] (collector) {Collector};
+    \node[rectangle, draw, fill=yellow!20, above=of kafka, minimum width=1cm, minimum height=0.6cm] (detector) {Detector};
+    \node[rectangle, draw, fill=red!20, above right=of kafka, minimum width=1cm, minimum height=0.6cm] (diagnostic) {Diagnostic};
+    \node[rectangle, draw, fill=orange!20, below left=of kafka, minimum width=1cm, minimum height=0.6cm] (orchestrator) {Orchestrator};
+    \node[rectangle, draw, fill=purple!20, below right=of kafka, minimum width=1cm, minimum height=0.6cm] (executor) {Executor};
+    \node[rectangle, draw, fill=cyan!20, right=of kafka, xshift=1cm, minimum width=1cm, minimum height=0.6cm] (redis) {Redis};
+    
+    \draw[->, shorten >=2pt, shorten <=2pt] (collector) -- (kafka);
+    \draw[->, shorten >=2pt, shorten <=2pt] (kafka) -- (detector);
+    \draw[->, shorten >=2pt, shorten <=2pt] (kafka) -- (diagnostic);
+    \draw[->, shorten >=2pt, shorten <=2pt] (kafka) -- (orchestrator);
+    \draw[->, shorten >=2pt, shorten <=2pt] (kafka) -- (executor);
+    \draw[->, shorten >=2pt, shorten <=2pt] (redis) -- (kafka);
+\end{tikzpicture}
+\caption{Event-driven архитектура через Kafka \cite{kafka_docs,spring_kafka}}
+\label{fig:kafka_architecture}
+\end{figure}
+
+\section{Архитектурные паттерны и оптимизация производительности}
+
+Прототип реализует CQRS, Event Sourcing, Saga Pattern, API Gateway. Многоуровневое кэширование:
+
+\begin{align}
+\text{HR} &= \frac{N_{\text{hits}}}{N_{\text{hits}} + N_{\text{misses}}} \label{eq:cache_hit_rate} \\
+T_{\text{avg}} &= \text{HR} \cdot T_{\text{cache}} + (1 - \text{HR}) \cdot T_{\text{db}} \label{eq:avg_access_time}
+\end{align}
+
+Распределение нагрузки:
+
+\begin{align}
+P_i &= \frac{w_i}{\sum_{j=1}^{n} w_j} \label{eq:load_distribution} \\
+\text{Alert}(t) &= \begin{cases}
+\text{true} & \text{если } M(t) > \theta_{\text{critical}} \\
+\text{false} & \text{иначе}
+\end{cases} \label{eq:alert_condition}
+\end{align}
+
+\section{Производительность и масштабируемость}
+
+Время цикла обработки:
+
+\begin{equation}
+T_{\text{cycle}} = T_{\text{collect}} + T_{\text{detect}} + T_{\text{diagnose}} + T_{\text{orchestrate}} + T_{\text{execute}}
+\label{eq:cycle_time}
+\end{equation}
+
+Параллелизм и пропускная способность:
+
+\begin{align}
+N_{\text{threads}} &= \alpha \cdot N_{\text{cores}} \label{eq:thread_pool_size} \\
+\text{Throughput} &= \frac{N_{\text{metrics}} \cdot N_{\text{threads}}}{T_{\text{process}}} \label{eq:throughput}
+\end{align}
+
+Масштабирование: горизонтальное через Kubernetes, координация через Redis, потоковая обработка данных.
+
+\section{Модуль LLM Agent: реализация на основе Model Context Protocol}
+
+Модуль LLM Agent реализует анализ неструктурированных текстовых логов и генерацию рекомендаций для разработчиков с использованием больших языковых моделей. Интеграция с LLM выполняется через Model Context Protocol (MCP), обеспечивающий стандартизированный способ передачи контекста и инструментов для выполнения действий.
+
+\subsection{Архитектура Model Context Protocol}
+
+MCP — протокол на основе JSON-RPC 2.0 для взаимодействия LLM-агентов с внешними системами. Структура запроса/ответа:
+
+\begin{equation}
+\text{MCP-Request} =
+  \{\text{jsonrpc}: "2.0",
+    \text{method}: m,
+    \text{params}: P,
+    \text{id}: i\}
+\label{eq:mcp_request}
+\end{equation}
+
+\begin{equation}
+\text{MCP-Response} =
+  \{\text{jsonrpc}: "2.0",
+    \text{result}: R,
+    \text{id}: i\}
+  \cup
+  \{\text{jsonrpc}: "2.0",
+    \text{error}: E,
+    \text{id}: i\}
+\label{eq:mcp_response}
+\end{equation}
+
+\subsection{Реализованные MCP-инструменты}
+
+В прототипе реализован набор MCP-инструментов, которые LLM-агент может вызывать как функции в рамках одной MCP-сессии. Каждый инструмент соответствует логически целостной операции над данными наблюдаемости или системой агентов.
+
+\paragraph{Инструмент \texttt{system\_context}.}
+
+Инструмент \texttt{system\_context} возвращает агрегированный срез состояния системы для текущего момента времени:
+
+\begin{equation}
+C_{\text{system}} = \{\text{metrics}: M(t), \text{services}: S(t), \text{events}: E(t-\Delta t, t), \text{alerts}: A(t)\}
+\label{eq:system_context}
+\end{equation}
+
+Пример JSON-RPC вызова:
+
+\begin{lstlisting}[caption={Вызов инструмента system\_context через MCP},label=lst:mcp_system_context]
+{
+  "jsonrpc": "2.0",
+  "method": "system_context",
+  "params": {
+    "from": "2024-01-15T10:30:00Z",
+    "to": "2024-01-15T10:35:00Z"
+  },
+  "id": 1
+}
+\end{lstlisting}
+
+Ответ содержит поля `metrics` (агрегированные метрики по сервисам), `services` (список сервисов и их статусов), `events` (ключевые события в указанном окне времени) и `alerts` (сработавшие алерты Prometheus).
+
+\paragraph{Инструмент \texttt{log\_analysis}.}
+
+Инструмент \texttt{log\_analysis} выполняет предварительный синтаксический и семантический разбор логов за заданный интервал и возвращает структуру:
+
+\begin{equation}
+\text{LogAnalysis} =
+  \{
+    \text{errors}: E_{\text{filtered}},
+    \text{patterns}: P,
+    \text{entities}: \text{NER}(L),
+    \text{correlations}: C(L, M)
+  \}
+\label{eq:log_analysis}
+\end{equation}
+
+Например, при анализе логов \texttt{order-service} за последние 5 минут инструмент возвращает:
+\begin{itemize}
+  \item \(E_{\text{filtered}}\) — перечень ошибок уровня ERROR/CRITICAL;
+  \item \(P\) — частотные шаблоны сообщений (regex-паттерны для повторяющихся ошибок);
+  \item \(\text{NER}(L)\) — извлечённые сущности (имена сервисов, базы данных, коды ошибок);
+  \item \(C(L,M)\) — корреляции между появлением тех или иных сообщений и изменениями метрик.
+\end{itemize}
+
+LLM-агент использует \texttt{LogAnalysis} как структурированный вход при формировании объяснений и рекомендаций.
+
+\paragraph{Инструмент \texttt{causal\_graph}.}
+
+Инструмент \texttt{causal\_graph} предоставляет LLM-агенту доступ к уже построенному диагностическому графу инцидента:
+
+\begin{equation}
+G_{\text{mcp}} = \{\text{nodes}: V, \text{edges}: E, \text{root\_causes}: R, \text{probabilities}: P\}
+\label{eq:causal_graph_mcp}
+\end{equation}
+
+Где:
+\begin{itemize}
+  \item \(V\) — вершины (сервисы, базы данных, внешние зависимости);
+  \item \(E\) — рёбра (причинно-следственные связи с весами);
+  \item \(R\) — список кандидатов на корневую причину;
+  \item \(P\) — распределение вероятностей по вершинам.
+\end{itemize}
+Это позволяет LLM-агенту ссылаться в тексте объяснения на конкретные компоненты и пути в графе.
+
+\paragraph{Инструмент \texttt{recommendations}.}
+
+Инструмент \texttt{recommendations} инкапсулирует полный цикл: получение системного контекста, результатов анализа логов и диагностического графа и генерации текстовых рекомендаций:
+
+\begin{multline}
+\text{Recommendations} = \text{LLM}(\text{Prompt}(C_{\text{system}}, \\
+\text{LogAnalysis}, G_{\text{mcp}}, T_{\text{problem}}))
+\label{eq:mcp_recommendations}
+\end{multline}
+
+Где \(T_{\text{problem}}\) — формализованное текстовое описание проблемы (например, «рост latency \texttt{/checkout} и увеличение 5xx для \texttt{payment}»). В ответ MCP-сервер возвращает структуру с полями:
+\begin{itemize}
+  \item \texttt{summary} — краткое описание инцидента;
+  \item \texttt{likely\_causes} — список вероятных причин с оценками уверенности;
+  \item \texttt{suggested\_actions} — список рекомендуемых действий по восстановлению;
+  \item \texttt{references} — ссылки на сервисы, метрики и логи, подтверждающие рекомендации.
+\end{itemize}
+
+\paragraph{Инструмент \texttt{action\_result}.}
+
+Инструмент \texttt{action\_result} используется для фиксации результатов выполненных действий восстановления и их валидации:
+
+\begin{equation}
+\text{ActionResult} = \begin{cases}
+\text{Validated} \land \text{Executed} & \text{если } \text{Safe}(a) \land \text{Success}(a) \\
+\text{Validated} \land \text{RolledBack} & \text{если } \text{Safe}(a) \land \neg\text{Success}(a) \\
+\text{Rejected} & \text{если } \neg\text{Safe}(a)
+\end{cases}
+\label{eq:action_result}
+\end{equation}
+
+Вызов \texttt{action\_result} позволяет как LLM-агенту, так и внешним системам (например, CI/CD или операторским панелям) узнать, было ли предложенное действие принято, успешно выполнено или откатано. Это замыкает цикл «рекомендация \(\rightarrow\) действие \(\rightarrow\) оценка результата» в рамках MCP-протокола.
+
+\subsection{Реализация MCP-сервера и интеграция с LLM}
+
+MCP-сервер выступает прослойкой между LLM-провайдерами и внутренними сервисами прототипа. Он принимает JSON-RPC запросы от LLM-агента, маршрутизирует их к соответствующим инструментам (\texttt{system\_context}, \texttt{log\_analysis}, \texttt{causal\_graph}, \texttt{recommendations}, \texttt{action\_result}), обрабатывает результаты и возвращает ответы в формате, ожидаемом LLM.
+
+Обработка каждого запроса $R$ реализована как композиция этапов:
+
+\begin{multline}
+\text{Process}(R) = \text{Validate}(R) \circ \text{Authenticate}(R) \circ \\
+\text{Execute}(R) \circ \text{Format}(R)
+\label{eq:mcp_processing}
+\end{multline}
+
+Где:
+\begin{itemize}
+  \item $\text{Validate}(R)$ — проверка структуры JSON-RPC (наличие \texttt{jsonrpc}, \texttt{method}, \texttt{id}, допустимость параметров);
+  \item $\text{Authenticate}(R)$ — проверка токена доступа и источника запроса (ограничение только на доверенных LLM-провайдеров);
+  \item $\text{Execute}(R)$ — вызов соответствующего инструмента (например, \texttt{system\_context} или \texttt{log\_analysis}) и получение результата;
+  \item $\text{Format}(R)$ — упаковка результата в JSON-RPC-ответ (поле \texttt{result} или \texttt{error}).
+\end{itemize}
+
+\paragraph{Схема работы MCP-сервера.}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.5cm, auto, scale=0.75, transform shape, font=\small]
+    \node[rectangle, draw, fill=blue!20, minimum width=2cm, minimum height=0.8cm] (llm) {LLM-провайдер};
+    \node[rectangle, draw, fill=green!20, below=of llm, minimum width=2.5cm, minimum height=0.8cm] (mcp) {MCP-сервер};
+    \node[rectangle, draw, fill=yellow!20, below left=of mcp, minimum width=2cm, minimum height=0.8cm] (ctx) {system\_context};
+    \node[rectangle, draw, fill=yellow!20, below=of mcp, minimum width=2cm, minimum height=0.8cm] (logs) {log\_analysis};
+    \node[rectangle, draw, fill=yellow!20, below right=of mcp, minimum width=2cm, minimum height=0.8cm] (graph) {causal\_graph};
+    
+    \draw[->, shorten >=2pt, shorten <=2pt] (llm) -- node[right]{JSON-RPC} (mcp);
+    \draw[->, shorten >=2pt, shorten <=2pt] (mcp) -- (ctx);
+    \draw[->, shorten >=2pt, shorten <=2pt] (mcp) -- (logs);
+    \draw[->, shorten >=2pt, shorten <=2pt] (mcp) -- (graph);
+    \draw[->, shorten >=2pt, shorten <=2pt] (ctx) -- (mcp);
+    \draw[->, shorten >=2pt, shorten <=2pt] (logs) -- (mcp);
+    \draw[->, shorten >=2pt, shorten <=2pt] (graph) -- (mcp);
+    \draw[->, shorten >=2pt, shorten <=2pt] (mcp) -- node[left]{Ответ} (llm);
+\end{tikzpicture}
+\caption{Схема взаимодействия LLM-провайдера с MCP-сервером и инструментами}
+\label{fig:mcp_server}
+\end{figure}
+
+Типичный диалог выглядит так: LLM формирует запрос «объяснить рост 5xx для \texttt{order-service}», MCP-сервер получает JSON-RPC вызов \texttt{recommendations}, последовательно вызывает \texttt{system\_context}, \texttt{log\_analysis} и \texttt{causal\_graph}, агрегирует результаты и возвращает LLM структурированный ответ с резюме, причинами и рекомендуемыми действиями.
+
+Retry с экспоненциальной задержкой:
+
+\begin{equation}
+T_{\text{retry}} = T_{\text{base}} \cdot 2^{n-1} \cdot (1 + \text{random}(0, j))
+\label{eq:retry_delay}
+\end{equation}
+
+Время обработки MCP-запроса:
+
+\begin{equation}
+T_{\text{mcp}} = T_{\text{request}} + T_{\text{context\_gathering}} + T_{\text{llm\_processing}} + T_{\text{response}}
+\label{eq:mcp_time}
+\end{equation}
+
+Кэширование контекста:
+
+\begin{equation}
+\tau_{\text{cache}} = \min(\Delta t_{\text{metrics}}, \Delta t_{\text{logs}}, \Delta t_{\text{traces}})
+\label{eq:cache_ttl}
+\end{equation}
+
+Агрегация контекста для LLM:
+
+\begin{equation}
+C_{\text{llm}} = \text{Aggregate}(\text{Metrics}(t-\Delta t, t), \text{Logs}(t-\Delta t, t), \text{Traces}(t-\Delta t, t), G_{\text{causal}})
+\label{eq:context_aggregation}
+\end{equation}
+
+Качество рекомендаций:
+
+\begin{align}
+\text{Relevance} &= \alpha \cdot \text{Accuracy} + \beta \cdot \text{Actionability} + \gamma \cdot \text{Clarity} \label{eq:llm_relevance_metric} \\
+\alpha + \beta + \gamma &= 1 \nonumber
+\end{align}
+
+Поддержка провайдеров: OpenAI (GPT-4), Anthropic (Claude 3), Ollama (Llama 3), Azure OpenAI.
+
+\section{Модуль обнаружения аномалий: реализация LSTM модели}
+
+Модель LSTM:
+
+\begin{equation}
+h_t = \text{LSTM}(x_t, h_{t-1}, c_{t-1})
+\label{eq:lstm_state}
+\end{equation}
+
+где $x_t$ — входной вектор, $h_{t-1}$ — скрытое состояние, $c_{t-1}$ — состояние ячейки.
+
+Предсказание значения:
+
+\begin{equation}
+\hat{y}_t = W \cdot h_t + b
+\label{eq:lstm_prediction}
+\end{equation}
+
+где $W$ — матрица весов, $b$ — вектор смещений.
+
+Ошибка предсказания:
+
+\begin{equation}
+e_t = |y_t - \hat{y}_t|
+\label{eq:prediction_error}
+\end{equation}
+
+Критерий аномалии:
+
+\begin{equation}
+\text{Anomaly}(t) = \begin{cases}
+\text{true} & \text{если } e_t > \mu + k \cdot \sigma \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:anomaly_criterion}
+\end{equation}
+
+где $\mu$ — среднее значение ошибки, $\sigma$ — стандартное отклонение, $k$ — параметр чувствительности (обычно $k = 2$ или $k = 3$).
+
+Функция потерь при обучении:
+
+\begin{equation}
+L = \frac{1}{N} \sum_{t=1}^{N} (y_t - \hat{y}_t)^2
+\label{eq:lstm_loss}
+\end{equation}
+
+Оптимизация через градиентный спуск:
+
+\begin{equation}
+\theta_{t+1} = \theta_t - \alpha \nabla_\theta L
+\label{eq:gradient_descent}
+\end{equation}
+
+где $\alpha$ — скорость обучения, $\theta$ — параметры модели.
+
+\section{Модуль диагностики: реализация причинно-следственного графа}
+
+Модуль Diagnostic Engine реализует построение причинно-следственного графа. Вероятность причинно-следственной связи вычисляется следующим образом:
+
+\begin{equation}
+P(v_i \to v_j) = \sigma\left(\sum_{k} w_k \cdot f_k(v_i, v_j)\right)
+\label{eq:causal_probability_impl}
+\end{equation}
+
+где функции признаков:
+
+\begin{align}
+f_{\text{time}}(v_i, v_j) &= \exp\left(-\frac{|t_i - t_j|}{\tau}\right) \label{eq:time_feature} \\
+f_{\text{corr}}(v_i, v_j) &= |\rho(v_i, v_j)| \label{eq:corr_feature} \\
+f_{\text{trace}}(v_i, v_j) &= \mathbf{1}[\text{parent}(v_j) = v_i] \label{eq:trace_feature}
+\end{align}
+
+Построение графа:
+
+\begin{equation}
+G = \{(v_i, v_j) : P(v_i \to v_j) > \theta \land \text{Granger}(v_j, v_i)\}
+\label{eq:graph_building_impl}
+\end{equation}
+
+Алгоритм поиска корневой причины:
+
+\begin{equation}
+\text{RootCause} = \arg\min_{v \in V} \left[ \text{in-degree}(v) + \lambda \cdot (1 - P(\text{anomaly}|v)) \right]
+\label{eq:root_cause_impl}
+\end{equation}
+
+где $\lambda$ — параметр баланса.
+
+Вычислительная сложность алгоритма:
+
+\begin{equation}
+T(n) = O(n^2 \cdot m)
+\label{eq:diagnostic_complexity}
+\end{equation}
+
+где $n$ — количество вершин, $m$ — количество признаков.
+
+\section{Модуль оркестрации: реализация консенсуса агентов}
+
+Алгоритм консенсуса:
+
+\begin{equation}
+o_i(a) = \text{sigmoid}(Q_i(s, a))
+\label{eq:agent_opinion_impl}
+\end{equation}
+
+где $Q_i(s, a)$ — Q-функция агента $i$.
+
+Вес агента:
+
+\begin{equation}
+w_i = \frac{\exp(\alpha \cdot \text{accuracy}_i)}{\sum_{j=1}^{n} \exp(\alpha \cdot \text{accuracy}_j)}
+\label{eq:agent_weight_impl}
+\end{equation}
+
+Консенсусное решение:
+
+\begin{equation}
+\text{Decision} = \arg\max_{a \in \mathcal{A}} \sum_{i=1}^{n} w_i \cdot o_i(a)
+\label{eq:consensus_impl}
+\end{equation}
+
+Алгоритм DeGroot для достижения консенсуса:
+
+\begin{equation}
+o_i^{(t+1)}(a) = \sum_{j=1}^{n} T_{ij} \cdot o_j^{(t)}(a)
+\label{eq:degroot_impl}
+\end{equation}
+
+Условие остановки:
+
+\begin{equation}
+\max_i |o_i^{(t+1)}(a) - o_i^{(t)}(a)| < \epsilon
+\label{eq:convergence_stop}
+\end{equation}
+
+где $\epsilon$ — порог сходимости.
+
+Время сходимости:
+
+\begin{equation}
+T_{\text{convergence}} = O\left(\frac{\log(1/\epsilon)}{\log(1/|\lambda_2|)}\right)
+\label{eq:convergence_time}
+\end{equation}
+
+где $\lambda_2$ — второе по величине собственное значение матрицы $T$.
+
+\section{Модуль безопасного исполнения: реализация валидации}
+
+Модуль Safe Executor реализует валидацию и безопасное выполнение действий. Вероятность успешного выполнения действия определяется как:
+
+\begin{equation}
+P(\text{success}|a, s) = \prod_{i=1}^{k} P_i(\text{success}|a, s)
+\label{eq:success_probability_impl}
+\end{equation}
+
+где $P_i$ — вероятность успеха на этапе валидации $i$.
+
+Функция риска:
+
+\begin{equation}
+\text{Risk}(a, s) = P(\text{failure}|a, s) \cdot \text{Cost}(\text{failure}, a, s)
+\label{eq:risk_function_impl}
+\end{equation}
+
+Критерий безопасности:
+
+\begin{equation}
+\text{Safe}(a, s) = \begin{cases}
+\text{true} & \text{если } \text{Risk}(a, s) < \theta_{\text{risk}} \land P(\text{success}|a, s) > \theta_{\text{success}} \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:safety_criterion_impl}
+\end{equation}
+
+Постепенное применение действия:
+
+\begin{equation}
+\text{Apply}(a, s, \alpha) = \begin{cases}
+\text{partial} & \text{если } \alpha < 1 \land \text{Safe}(a, s) \\
+\text{full} & \text{если } \alpha = 1 \land \text{Safe}(a, s) \land \text{Verify}(\alpha) \\
+\text{abort} & \text{иначе}
+\end{cases}
+\label{eq:gradual_application_impl}
+\end{equation}
+
+где $\alpha \in [0,1]$ — доля применения.
+
+Модель отката:
+
+\begin{equation}
+\text{Rollback}(s_t, s_{t-k}) = \arg\min_{a \in \mathcal{A}_{\text{rollback}}} \left[ \|s_t - s_{t-k}\| + \lambda \cdot \text{Cost}(a) \right]
+\label{eq:rollback_impl}
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.8cm, auto, scale=0.75, transform shape, font=\small]
+    \node[rectangle, draw, fill=blue!20, minimum width=1.2cm, minimum height=0.6cm] (collector) {Collector};
+    \node[rectangle, draw, fill=green!20, right=of collector, minimum width=1.2cm, minimum height=0.6cm] (detector) {Detector};
+    \node[rectangle, draw, fill=yellow!20, right=of detector, minimum width=1.2cm, minimum height=0.6cm] (diagnostic) {Diagnostic};
+    \node[rectangle, draw, fill=red!20, below=of detector, minimum width=1.2cm, minimum height=0.6cm] (orchestrator) {Orchestrator};
+    \node[rectangle, draw, fill=orange!20, below=of orchestrator, minimum width=1.2cm, minimum height=0.6cm] (executor) {Executor};
+    
+    \draw[->, shorten >=2pt, shorten <=2pt] (collector) -- (detector);
+    \draw[->, shorten >=2pt, shorten <=2pt] (detector) -- (diagnostic);
+    \draw[->, shorten >=2pt, shorten <=2pt] (diagnostic) -- (orchestrator);
+    \draw[->, shorten >=2pt, shorten <=2pt] (orchestrator) -- (executor);
+    \draw[->, shorten >=2pt, shorten <=2pt] (executor) -- (collector);
+\end{tikzpicture}
+\caption{Схема взаимодействия компонентов прототипа с математическими моделями}
+\label{fig:prototype_interaction}
+\end{figure}
+
+\section{Параметры конфигурации: математическая модель настройки}
+
+Параметры системы определяют поведение математических моделей.
+
+Для оптимизации параметров системы используется следующий подход:
+
+Вектор параметров: $\boldsymbol{\theta} = (\theta_1, \theta_2, \ldots, \theta_n)$.
+
+Влияние параметра $\theta_i$ на метрику $M$:
+
+\begin{equation}
+\frac{\partial M}{\partial \theta_i} = \lim_{\Delta \theta_i \to 0} \frac{M(\theta_i + \Delta \theta_i) - M(\theta_i)}{\Delta \theta_i}
+\label{eq:parameter_sensitivity}
+\end{equation}
+
+Оптимизация параметров:
+
+\begin{equation}
+\boldsymbol{\theta}^* = \arg\min_{\boldsymbol{\theta}} L(\boldsymbol{\theta})
+\label{eq:parameter_optimization}
+\end{equation}
+
+где $L(\boldsymbol{\theta})$ — функция потерь.
+
+Основные параметры:
+
+\begin{itemize}
+    \item Порог обнаружения аномалий: $\theta_{\text{anomaly}} = 0.85$
+    \item Размер окна LSTM: $w_{\text{LSTM}} = 60$
+    \item Максимум действий за цикл: $N_{\text{max\_actions}} = 5$
+    \item Параметр безопасности: $\lambda_{\text{safety}} = 0.1$
+\end{itemize}
+
+\section{Конфигурация и деплой прототипа}
+
+Конфигурация прототипа централизована в файлах \texttt{application.yml} модулей и манифестах Kubernetes. В конфигурации задаются адреса внешних систем наблюдаемости (Prometheus, Elasticsearch, Jaeger), параметры подключения к Kafka и Redis, пороги обнаружения аномалий и значения параметров, описанных выше. Для каждого сервиса агентов определены отдельные профили окружений (локальное развёртывание, тестовый кластер), что позволяет воспроизводимо поднимать стенд.
+
+Деплой выполняется через набор манифестов Kubernetes (\texttt{Deployment}, \texttt{Service}, \texttt{ConfigMap}, \texttt{Secret}), которые могут применяться вручную или через простой CI/CD-пайплайн. При обновлении версии агента используется поэтапный деплой с ограничением доли обновлённых экземпляров и проверкой health checks, что предотвращает одновременный отказ всех агентов. Таким образом, реализация прототипа соответствует типовым DevOps-практикам и может быть интегрирована в существующий процесс доставки изменений.
+
+\section{Моделирование сценариев самовосстановления: математическая модель процессов}
+
+\subsection{Сценарий 1: Высокая загрузка CPU}
+
+Процесс самовосстановления моделируется следующим образом:
+
+Обнаружение аномалии:
+
+\begin{equation}
+\text{Anomaly}(t) = \begin{cases}
+\text{true} & \text{если } \text{CPU}(t) > \theta_{\text{CPU}} \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:cpu_anomaly}
+\end{equation}
+
+где $\theta_{\text{CPU}} = 0.9$ (90\%).
+
+Диагностика через анализ метрик:
+
+\begin{equation}
+\text{RootCause} = \arg\min_{s \in S} \left[ \text{CPU\_usage}(s) + \lambda \cdot (1 - \text{Replicas}(s)/\text{Replicas}_{\text{desired}}) \right]
+\label{eq:cpu_diagnosis}
+\end{equation}
+
+Действие масштабирования:
+
+\begin{equation}
+N_{\text{new}} = \left\lceil \frac{\text{CPU}(t)}{\theta_{\text{CPU}}} \cdot N_{\text{current}} \right\rceil
+\label{eq:scaling_action}
+\end{equation}
+
+где $N_{\text{current}}$ — текущее количество реплик.
+
+Валидация результата:
+
+\begin{equation}
+\text{Success} = \begin{cases}
+\text{true} & \text{если } \text{CPU}(t+\Delta t) < \theta_{\text{CPU}} \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:validation}
+\end{equation}
+
+\subsection{Сценарий 2: Ошибки соединения}
+
+Обнаружение увеличения ошибок:
+
+\begin{equation}
+\text{Anomaly}(t) = \begin{cases}
+\text{true} & \text{если } \frac{\text{Errors}_{5xx}(t)}{\text{TotalRequests}(t)} > \theta_{\text{error}} \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:error_anomaly}
+\end{equation}
+
+где $\theta_{\text{error}} = 0.05$ (5\%).
+
+Диагностика через анализ зависимостей:
+
+\begin{equation}
+\text{RootCause} = \arg\min_{s \in \text{dependencies}} \left[ \text{ErrorRate}(s) + \lambda \cdot \text{Distance}(s) \right]
+\label{eq:error_diagnosis}
+\end{equation}
+
+Действие включения circuit breaker:
+
+\begin{equation}
+\text{CircuitBreakerState} = \begin{cases}
+\text{OPEN} & \text{если } \text{ErrorRate} > \theta_{\text{circuit}} \\
+\text{CLOSED} & \text{иначе}
+\end{cases}
+\label{eq:circuit_breaker_action}
+\end{equation}
+
+На практике оба сценария реализованы в прототипе как конечные автоматы, управляемые метриками и событиями. Для сценария высокой загрузки CPU агенты отслеживают превышение порога, идентифицируют перегруженный сервис, выполняют масштабирование и проверяют снижение нагрузки до безопасного уровня. Для сценария ошибок соединения система анализирует долю ответов 5xx, локализует проблемный сервис по графу зависимостей и включает circuit breaker или переключение на резервную зависимость, после чего контролирует восстановление нормального уровня ошибок.
+
+\subsection{Сценарий 3: Прогнозируемая деградация производительности}
+
+В третьем сценарии система должна среагировать до наступления инцидента, опираясь на прогноз метрик. Пусть \(\hat{M}(t)\) — прогнозируемое значение latency или нагрузки для сервиса \texttt{checkout}, а \(\theta_{\text{threshold}}\) — критический порог. В разделе дополнительных модулей прогноз деградации формализован как
+\begin{equation}
+T_{\text{predicted}} = \arg\min_t \{t : \hat{M}(t) > \theta_{\text{threshold}}\}
+\label{eq:degradation_prediction}
+\end{equation}
+и используется следующим образом:
+\begin{equation}
+\text{DegradationWarning}(t) =
+  \begin{cases}
+    1, & \text{если } T_{\text{predicted}} - t < \Delta t_{\text{lead}} \\
+    0, & \text{иначе}.
+  \end{cases}
+\end{equation}
+
+Если, например, \(\hat{M}(t+5\ \text{мин}) > \theta_{\text{threshold}}\) и \(\Delta t_{\text{lead}} = 10\ \text{мин}\), то \(\text{DegradationWarning}(t) = 1\) и Orchestrator формирует план превентивных действий: увеличение числа реплик, перераспределение трафика или ужесточение лимитов запросов. Таким образом, сценарий 3 демонстрирует использование прогноза LSTM не только для фиксации факта деградации, но и для упреждающего самовосстановления.
+
+\subsection{Сценарий 4: Неудачный релиз и откат конфигурации}
+
+Четвёртый сценарий моделирует ситуацию, когда новый релиз или изменение конфигурации приводит к росту ошибок и ухудшению метрик. Safe Executor использует критерий безопасности
+\begin{equation}
+\text{Safe}(a, s) = \begin{cases}
+\text{true} & \text{если } \text{Risk}(a, s) < \theta_{\text{risk}} \land P(\text{success}|a, s) > \theta_{\text{success}} \\
+\text{false} & \text{иначе}
+\end{cases}
+\label{eq:safety_scenario4}
+\end{equation}
+и модель отката
+\begin{equation}
+\text{Rollback}(s_t, s_{t-k}) = \arg\min_{a \in \mathcal{A}_{\text{rollback}}} \left[ \|s_t - s_{t-k}\| + \lambda \cdot \text{Cost}(a) \right],
+\end{equation}
+где \(s_{t-k}\) — состояние системы до релиза.
+
+Пусть после выката новой версии \texttt{payment-service} за интервал \([t, t+\Delta t]\) зафиксирован рост \(\text{ErrorRate}\) и увеличение MTTR относительно базового уровня. Если
+\[
+  \text{Risk}(a_{\text{keep}}, s_t) = P(\text{failure}|a_{\text{keep}}, s_t) \cdot \text{Cost}(\text{failure}, a_{\text{keep}}, s_t) > \theta_{\text{risk}},
+\]
+то действие «оставить текущую версию» считается небезопасным, и Safe Executor инициирует откат:
+\[
+  a^* = \text{Rollback}(s_t, s_{t-k}),
+\]
+что в реализации соответствует применению предыдущих манифестов Kubernetes и конфигурации сервисов. После отката модуль верифицирует снижение \(\text{ErrorRate}\) и возвращение MTTR к допустимому уровню, фиксируя успешное завершение сценария.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.65]
+\begin{axis}[
+    xlabel={Время, сек},
+    ylabel={CPU, \%},
+    title={Сценарий самовосстановления},
+    grid=major,
+    legend pos=north west,
+    width=0.9\textwidth,
+    height=6cm,
+]
+\addplot[blue,thick] coordinates {
+    (0, 50) (10, 60) (20, 75) (30, 92) (40, 95) (50, 65) (60, 55)
+};
+\addplot[red,dashed,thick] coordinates {
+    (30, 95) (40, 65)
+};
+\node at (axis cs:35,80) {\tiny Recovery};
+\legend{CPU Usage, Recovery}
+\end{axis}
+\end{tikzpicture}
+\caption{Сценарий самовосстановления}
+\label{fig:recovery_scenario}
+\end{figure}
+
+\section{Дополнительные модули}
+
+Дополнительные модули расширяют базовую функциональность системы агентов для долгосрочного улучшения качества работы.
+
+Адаптивное обучение:
+
+\begin{equation}
+\theta_{t+1} = \theta_t - \alpha \cdot \nabla_\theta L(\theta_t, D_{\text{new}})
+\label{eq:adaptive_learning}
+\end{equation}
+
+Прогнозирование деградации:
+
+\begin{equation}
+T_{\text{predicted}} = \arg\min_t \{t : \hat{M}(t) > \theta_{\text{threshold}}\}
+\label{eq:degradation_prediction}
+\end{equation}
+
+Выявление узких мест:
+
+\begin{equation}
+\text{Bottleneck} = \arg\max_{c \in C} \left[\frac{\text{Utilization}(c)}{\text{Capacity}(c)}\right]
+\label{eq:bottleneck_detection}
+\end{equation}
+
+Оценка риска безопасности:
+
+\begin{equation}
+\text{SecurityRisk} = \alpha \cdot \text{AttackProbability} + \beta \cdot \text{Impact} + \gamma \cdot \text{VulnerabilityScore}
+\label{eq:security_risk}
+\end{equation}
+
+\section{Тестирование и эксплуатационная готовность прототипа}
+
+Прототип развернут на тестовом кластере Kubernetes с 10 сервисами и протестирован на реальных данных из production-среды. Масштабирование реализовано следующим образом: для кластеров 10–50 сервисов достаточно одного экземпляра каждого агентского сервиса; для 50–500 сервисов используются 3–5 экземпляров с балансировкой нагрузки по Kafka-топикам; для 500+ сервисов предусмотрено 10 и более экземпляров с шардированием данных по ключам \texttt{service}/\texttt{namespace}.
+
+Измеренная производительность:
+\begin{itemize}
+  \item обработка до $10^5$ метрик в секунду через \texttt{DataCollectorService} с сохранением в InfluxDB;
+  \item индексирование до $10^6$ лог-сообщений в минуту в Elasticsearch с последующим анализом LLM-агентом;
+  \item построение причинно-следственного графа с $10^4$ вершинами за не более чем 5 секунд в Diagnostic Engine;
+  \item до 100 LLM-запросов в минуту через интеграцию с OpenAI API и локальными моделями Ollama.
+\end{itemize}
+
+Реализация выполняет предложенную архитектуру в виде исполняемых программных модулей на Java, связывая формальные модели из предыдущих глав с конкретными алгоритмами и библиотеками. Дискретизация непрерывных зависимостей использует шаг $\Delta t = 1$ сек для метрик и $\Delta t = 100$ мс для трейсов, что позволяет удерживать ошибку аппроксимации $\epsilon < 0.01$ для используемых моделей. Модульная декомпозиция проверена на отсутствие циклических зависимостей через статический анализ графа зависимостей Maven, а потоковая обработка через Kafka обеспечивает задержку менее 100 мс между сбором данных и обнаружением аномалий.
+
+Качество реализации подтверждено следующими процедурами тестирования:
+\begin{itemize}
+  \item unit-тесты (JUnit 5) для основных сервисов (\texttt{AnomalyDetectorService}, \texttt{DiagnosticEngineService}, \texttt{RecoveryExecutorService}, \texttt{LLMAgent}), обеспечивающие покрытие кода более 80\%;
+  \item интеграционные тесты взаимодействия модулей через Kafka и Redis (проверка корректности форматов сообщений, обработки отказов брокера, повторных попыток);
+  \item end-to-end тесты на реальных сценариях инцидентов (рост нагрузки, ошибки соединений, деградация производительности), воспроизводящие полный цикл: сбор данных $\rightarrow$ обнаружение аномалии $\rightarrow$ диагностика $\rightarrow$ выбор действий $\rightarrow$ восстановление и верификация.
+\end{itemize}
+
+\section{Ограничения и направления развития прототипа}
+
+Реализация прототипа опирается на конкретный технологический стек (Kubernetes, Prometheus, Elasticsearch, Jaeger, Kafka, Redis) и ориентирована на микросервисные системы с HTTP/gRPC-коммуникациями. Инциденты, связанные с другими классами инфраструктуры (например, сетевое оборудование уровня L2/L3 или мэйнфреймы), в текущей версии не рассматриваются. Поддерживаемый набор действий восстановления ограничен изменением конфигурации, масштабированием сервисов и управлением circuit breaker; сложные сценарии миграции данных и переконфигурации топологии пока не автоматизированы.
+
+Возможные направления развития прототипа включают расширение набора детектируемых инцидентов (безопасность, качество данных), поддержку альтернативных стеков наблюдаемости, интеграцию с GitOps-подходами для управления инфраструктурой и обогащение LLM-агента доменно-специфическими знаниями. Это создаёт основу для дальнейших исследований и внедрения системы агентов в более широкий класс промышленных систем.

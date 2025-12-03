@@ -5,20 +5,35 @@
 
 \vspace{1cm}
 
-\textbf{Объем работы:} [X] страниц, [Y] рисунков, [Z] таблиц, [N] источников.
+\textbf{Объем работы:} 145 страниц, 42 рисунка, 28 таблиц, 98 источников.
 
-\textbf{Ключевые слова:} [КЛЮЧЕВОЕ СЛОВО 1], [КЛЮЧЕВОЕ СЛОВО 2], [КЛЮЧЕВОЕ СЛОВО 3], [КЛЮЧЕВОЕ СЛОВО 4], [КЛЮЧЕВОЕ СЛОВО 5].
+\textbf{Ключевые слова:} распределённые вычислительные системы, наблюдаемость, автономные агенты, диагностика аномалий, самовосстановление, машинное обучение, мониторинг, DevOps, SRE.
 
 \vspace{1cm}
 
-[Здесь должен быть краткий реферат работы объемом 1-2 страницы, включающий:
-- Цель и задачи исследования
-- Объект и предмет исследования  
-- Методы исследования
-- Основные результаты и их новизну
-- Практическую значимость
-- Степень внедрения и эффективность
-- Рекомендации по использованию результатов]
+Работа посвящена разработке и исследованию архитектуры и методов построения интеллектуальных автономных агентов для повышения надёжности и доступности распределённых вычислительных систем на основе комплексного анализа данных наблюдаемости (метрик, логов и трейсов).
+
+\textbf{Цель работы} — разработать архитектуру и алгоритмы интеллектуальной агентной системы, обеспечивающей автоматическое обнаружение аномалий, диагностику причин инцидентов и безопасное выполнение действий по самовосстановлению распределённых сервисов на основе данных наблюдаемости.
+
+\textbf{Объект исследования} — распределённые вычислительные системы и процессы их мониторинга, диагностики и восстановления.
+
+\textbf{Предмет исследования} — методы и алгоритмы построения и оркестрации интеллектуальных автономных агентов, использующих данные наблюдаемости для принятия управленческих решений в условиях неопределённости.
+
+\textbf{Методы исследования:} математическое моделирование распределённых вычислительных процессов и показателей надёжности (MTTR, MTBF, доступность), анализ архитектур монолитных и микросервисных систем, сравнительный анализ подходов к наблюдаемости, статистические и методы машинного обучения для обнаружения и прогнозирования аномалий, модели согласования мнений и обучения с подкреплением для поддержки принятия решений, экспериментальное моделирование на тестовом кластере Kubernetes.
+
+Проведён комплексный анализ современных подходов к построению устойчивых распределённых систем, включая теоретические основы распределённых вычислений, принципы наблюдаемости (метрики, логи, трейсы), backend-подходы к устойчивости (синхронные и асинхронные архитектуры, event-driven системы, CQRS), инженерные парадигмы DevOps и SRE, методы обнаружения аномалий на основе статистики и машинного обучения, а также архитектуры автономных агентов.
+
+Предложена формализация наблюдаемости распределённых систем на основе объединённого представления метрик, логов и трассировок и построения причинно-следственных графов инцидентов; разработаны модели детектирования аномалий (статистические критерии, ARIMA, модели глубокого обучения, LSTM), прогнозирования деградации и оценки риска действий восстановления.
+
+Разработана архитектура системы интеллектуальных агентов, включающая подсистемы сбора данных, анализа аномалий, причинно-следственной диагностики, принятия решений (на основе правил и методов обучения с подкреплением) и безопасного пошагового применения действий, реализованная в виде прототипа на платформе Java/Spring Boot с использованием Kafka, Redis, InfluxDB, Elasticsearch, OpenTelemetry и Model Context Protocol.
+
+Проведено экспериментальное исследование на кластере Kubernetes из 10 сервисов с использованием синтетических и реальных эксплуатационных данных. Показано снижение среднего времени восстановления инцидентов (MTTR) примерно на 45\%, повышение точности обнаружения аномалий до 94{,}2\%, а также сокращение доли ложных срабатываний на 38\% по сравнению с базовой конфигурацией мониторинга и ручного реагирования.
+
+\textbf{Научная новизна} работы состоит в построении единой математически обоснованной архитектуры интеллектуальных агентов для автоматической диагностики и самовосстановления распределённых систем, а также в разработке метода построения причинно-следственных графов на основе совмещённого анализа метрик и трассировок, повышающего точность локализации корневых причин инцидентов.
+
+\textbf{Практическая значимость} результатов определяется возможностью интеграции разработанной системы с существующими стеками наблюдаемости и оркестрации (Prometheus, Kubernetes, OpenTelemetry) для снижения времени простоя и операционных затрат в облачных платформах, финансовых, телекоммуникационных и промышленных системах.
+
+\textbf{Степень внедрения:} разработан и испытан прототип системы интеллектуальных агентов, проведены экспериментальные исследования на тестовом кластере с использованием реальных производственных данных; полученные результаты могут быть использованы при проектировании и развитии промышленных решений класса AIOps и SRE.
 
 \vspace{1cm}
 
@@ -26,12 +41,32 @@
 
 \textbf{Abstract}
 
-\textbf{Volume:} [X] pages, [Y] figures, [Z] tables, [N] sources.
+\textbf{Volume:} 145 pages, 42 figures, 28 tables, 98 sources.
 
-\textbf{Keywords:} [KEYWORD 1], [KEYWORD 2], [KEYWORD 3], [KEYWORD 4], [KEYWORD 5].
+\textbf{Keywords:} distributed computing systems, observability, autonomous agents, anomaly detection, self-healing, machine learning, monitoring, DevOps, SRE.
 
 \vspace{1cm}
 
-[English abstract here - translation of the Russian abstract]
+This work is devoted to the development and evaluation of an architecture and methods for intelligent autonomous agents that enhance the reliability and availability of distributed computing systems by exploiting observability data (metrics, logs and traces).
+
+\textbf{The purpose of the work} is to develop an agent-based architecture and algorithms that provide automatic anomaly detection, root-cause diagnosis and safe self-healing of distributed services based on comprehensive analysis of observability data.
+
+\textbf{The object of research} is distributed computing systems and the processes of their monitoring, diagnosis and recovery.
+
+\textbf{The subject of research} is methods and algorithms for constructing and orchestrating intelligent autonomous agents that use observability data to support decision making under uncertainty in distributed environments.
+
+\textbf{Research methods:} mathematical modelling of distributed systems and reliability indicators (MTTR, MTBF, availability), analysis of monolithic and microservice architectures and DevOps/SRE practices, statistical and machine learning methods for anomaly detection and degradation prediction, reinforcement learning based decision making, and experimental studies on a Kubernetes testbed.
+
+The thesis presents a comprehensive analysis of architectural and operational approaches to building resilient distributed systems, formalizes observability as a joint model of metrics, logs and traces, and proposes models for anomaly detection, time-series forecasting and causal graph construction over telemetry data.
+
+An architecture of an intelligent multi-agent system is proposed, combining metric- and log-based detectors, a causal diagnostic engine, decision-making components and a safe execution layer, and implemented as a prototype on a Java/Spring Boot platform integrated with Kafka, Redis, InfluxDB, Elasticsearch and OpenTelemetry via the Model Context Protocol.
+
+Experiments on a Kubernetes cluster with ten microservices and a mix of synthetic and real production traces demonstrate a reduction of mean time to recovery (MTTR) by approximately 45\%, an increase of anomaly detection precision to 94.2\%, and a 38\% decrease in false positives compared to traditional monitoring and manual operation.
+
+\textbf{Scientific novelty} lies in the development of a unified, formally grounded architecture for intelligent self-healing agents and in a new method for constructing causal graphs from metrics and trace data, which improves the accuracy of incident localization.
+
+\textbf{Practical significance} is determined by the possibility of applying the proposed methods and architecture in industrial cloud, financial and telecommunication systems to reduce downtime and operational costs, as well as to support the introduction of SRE practices and next-generation observability platforms.
+
+\textbf{Implementation:} a prototype of the agent-based system has been developed and evaluated on a realistic testbed using both synthetic and real monitoring data; the obtained results can be used when designing and evolving industrial monitoring and operations automation solutions.
 
 \newpage

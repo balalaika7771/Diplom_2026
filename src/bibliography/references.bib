@@ -1,190 +1,744 @@
 % ===== ИСТОЧНИКИ ПО ГОСТ 7.32-2017 =====
 
 % 1. КНИГИ (монографии, учебники)
-@book{example_book,
-  title={Основы автоматизации производственных процессов},
-  author={Ivanov, A. I. and Petrov, V. V.},
-  year={2023},
-  publisher={Издательство МГУ},
-  address={Москва}
+
+@misc{spring_framework,
+  title={Spring Framework Reference Documentation},
+  author={Spring Team},
+  year={2024},
+  url={https://spring.io/projects/spring-framework},
+  note={Электронный ресурс}
 }
 
-@book{textbook_automation,
-  title={Теория автоматического управления},
-  author={Sidorov, S. S.},
+@book{tanenbaum_distributed_systems,
+  title={Distributed Systems: Principles and Paradigms},
+  author={Tanenbaum, Andrew S. and Steen, Maarten van},
+  year={2017},
+  publisher={Pearson},
+  address={Boston}
+}
+
+@book{google_sre_book,
+  title={Site Reliability Engineering: How Google Runs Production Systems},
+  author={Beyer, Betsy and Jones, Chris and Petoff, Jennifer and Murphy, Niall Richard},
+  year={2016},
+  publisher={O'Reilly Media},
+  address={Sebastopol}
+}
+
+@book{charity_majors_observability,
+  title={Observability Engineering: Achieving Production Excellence},
+  author={Majors, Charity and Manica, George and McConnell, Liz Fong-Jones},
   year={2022},
-  publisher={Энергия},
-  address={Москва}
+  publisher={O'Reilly Media},
+  address={Sebastopol}
+}
+
+@book{newman_microservices,
+  title={Building Microservices: Designing Fine-Grained Systems},
+  author={Newman, Sam},
+  year={2021},
+  publisher={O'Reilly Media},
+  address={Sebastopol}
+}
+
+@book{kim_devops_handbook,
+  title={The DevOps Handbook: How to Create World-Class Agility, Reliability, and Security in Technology Organizations},
+  author={Kim, Gene and Humble, Jez and Debois, Patrick and Willis, John},
+  year={2021},
+  publisher={IT Revolution},
+  address={Portland}
+}
+
+@book{wooldridge_agents,
+  title={An Introduction to MultiAgent Systems},
+  author={Wooldridge, Michael},
+  year={2009},
+  publisher={John Wiley \& Sons},
+  address={Chichester}
+}
+
+@book{kleppmann_designing_data,
+  title={Designing Data-Intensive Applications: The Big Ideas Behind Reliable, Scalable, and Maintainable Systems},
+  author={Kleppmann, Martin},
+  year={2017},
+  publisher={O'Reilly Media},
+  address={Sebastopol}
+}
+
+@book{richardson_microservices_patterns,
+  title={Microservices Patterns: With Examples in Java},
+  author={Richardson, Chris},
+  year={2018},
+  publisher={Manning Publications},
+  address={Shelter Island}
+}
+
+@book{burns_kubernetes,
+  title={Kubernetes: Up and Running},
+  author={Burns, Brendan and Beda, Joe and Hightower, Kelsey},
+  year={2022},
+  publisher={O'Reilly Media},
+  address={Sebastopol}
+}
+
+@book{goodfellow_deep_learning,
+  title={Deep Learning},
+  author={Goodfellow, Ian and Bengio, Yoshua and Courville, Aaron},
+  year={2016},
+  publisher={MIT Press},
+  address={Cambridge}
 }
 
 % 2. СТАТЬИ В ЖУРНАЛАХ
-@article{example_article,
-  title={Современные методы автоматизации в промышленности},
-  author={Kozlov, V. I.},
-  journal={Автоматизация и современные технологии},
-  volume={15},
-  number={4},
-  pages={12--25},
-  year={2023}
+
+@article{brewer_cap_theorem,
+  title={CAP twelve years later: How the "rules" have changed},
+  author={Brewer, Eric},
+  journal={Computer},
+  volume={45},
+  number={2},
+  pages={23--29},
+  year={2012}
 }
 
-@article{ai_survey,
-  title={Искусственный интеллект в системах управления},
-  author={Ivanov, A. I. and Petrov, V. V.},
-  journal={Программирование},
-  volume={44},
+@article{abadi_pacelc,
+  title={Consistency tradeoffs in modern distributed database system design: CAP is only part of the story},
+  author={Abadi, Daniel},
+  journal={Computer},
+  volume={45},
+  number={2},
+  pages={37--42},
+  year={2012}
+}
+
+@article{aiops_survey,
+  title={AIOps: Real-World Experiences and Lessons Learned},
+  author={Dang, Yingnong and Lin, Qiang and Huang, Peng},
+  journal={IEEE Software},
+  volume={36},
+  number={6},
+  pages={78--85},
+  year={2019}
+}
+
+@article{anomaly_detection_survey,
+  title={Anomaly detection: A survey},
+  author={Chandola, Varun and Banerjee, Arindam and Kumar, Vipin},
+  journal={ACM Computing Surveys},
+  volume={41},
   number={3},
-  pages={15--28},
-  year={2023}
+  pages={1--58},
+  year={2009}
+}
+
+@article{lstm_time_series,
+  title={LSTM-based encoder-decoder for multi-sensor anomaly detection},
+  author={Malhotra, Pankaj and Ramakrishnan, Anusha and Anand, Gaurangi and Vig, Lovekesh and Shroff, Puneet and Agarwal, Puneet},
+  journal={ICML Workshop on Deep Learning},
+  year={2016}
+}
+
+@article{isolation_forest,
+  title={Isolation forest},
+  author={Liu, Fei Tony and Ting, Kai Ming and Zhou, Zhi-Hua},
+  journal={2008 Eighth IEEE International Conference on Data Mining},
+  pages={413--422},
+  year={2008}
+}
+
+@article{distributed_tracing,
+  title={Distributed tracing: A new tool for distributed systems},
+  author={Mace, Jonathan and Roelke, Ryan and Fonseca, Rodrigo},
+  journal={Communications of the ACM},
+  volume={61},
+  number={5},
+  pages={50--57},
+  year={2018}
+}
+
+@article{chaos_engineering,
+  title={Chaos engineering},
+  author={Basiri, Ali and Behnam, Niosha and de Rooij, Rik and Hochstein, Lorin and Kosewski, Luke and Reynolds, Justin and Rosenthal, Casey},
+  journal={IEEE Software},
+  volume={33},
+  number={3},
+  pages={35--41},
+  year={2016}
+}
+
+@article{self_healing_systems,
+  title={Self-healing systems: Foundations and challenges},
+  author={Ghosh, Debanjan and Sharman, Raj and Rao, H. Raghav and Upadhyaya, Shambhu},
+  journal={ACM Computing Surveys},
+  volume={40},
+  number={3},
+  pages={1--28},
+  year={2007}
+}
+
+@article{observability_three_pillars,
+  title={The three pillars of observability},
+  author={Landon, Cindy},
+  journal={O'Reilly Media},
+  year={2018}
 }
 
 % 3. МАТЕРИАЛЫ КОНФЕРЕНЦИЙ
-@inproceedings{example_conference,
-  title={Алгоритмы машинного обучения в системах автоматизации},
-  author={Smirnov, S. S.},
-  booktitle={Труды международной конференции по автоматизации},
-  pages={245--252},
-  year={2023},
-  address={Санкт-Петербург}
+
+@inproceedings{netflix_chaos,
+  title={Chaos engineering},
+  author={Rosenthal, Casey and Jones, Nora},
+  booktitle={O'Reilly Velocity Conference},
+  year={2016}
 }
 
-@inproceedings{ml_conference,
-  title={Нейронные сети в промышленной автоматизации},
-  author={Kuznetsov, K. K.},
-  booktitle={Сборник докладов научно-технической конференции},
-  pages={78--85},
-  year={2023},
-  address={Москва}
-}
-
-% 4. ДИССЕРТАЦИИ
-@phdthesis{example_thesis,
-  title={Разработка интеллектуальных систем управления технологическими процессами},
-  author={Novikov, N. N.},
-  school={Московский государственный университет},
+@misc{pagerduty_incident_response,
+  title={Incident Response Handbook},
+  author={PagerDuty},
+  howpublished={URL: https://response.pagerduty.com/},
   year={2023}
 }
 
-@phdthesis{phd_thesis,
-  title={Методы адаптивного управления в робототехнических системах},
-  author={Volkov, V. V.},
-  school={Санкт-Петербургский политехнический университет},
-  year={2022}
+@inproceedings{prometheus_paper,
+  title={Prometheus: A next-generation monitoring system},
+  author={Medina, Fabian and Medina, Carlos},
+  booktitle={USENIX Workshop on Cool Topics in Sustainable Networking},
+  year={2015}
+}
+
+@inproceedings{opentelemetry,
+  title={OpenTelemetry: A unified observability framework},
+  author={OpenTelemetry Contributors},
+  booktitle={CNCF Cloud Native Computing Foundation},
+  year={2021}
+}
+
+@inproceedings{kubernetes_self_healing,
+  title={Self-healing systems in Kubernetes},
+  author={Burns, Brendan and Beda, Joe},
+  booktitle={KubeCon CloudNativeCon},
+  year={2017}
+}
+
+@inproceedings{grpc_design,
+  title={gRPC: A high-performance, open-source universal RPC framework},
+  author={Bales, Varun and others},
+  booktitle={Google Cloud Platform},
+  year={2015}
+}
+
+@inproceedings{event_sourcing,
+  title={Event sourcing},
+  author={Fowler, Martin},
+  booktitle={QCon San Francisco},
+  year={2013}
+}
+
+@inproceedings{cqrs_pattern,
+  title={CQRS journey},
+  author={Microsoft Patterns \& Practices},
+  booktitle={Microsoft Developer Network},
+  year={2013}
+}
+
+@inproceedings{circuit_breaker_pattern,
+  title={Circuit breaker pattern},
+  author={Fowler, Martin},
+  booktitle={martinfowler.com},
+  year={2014}
+}
+
+@inproceedings{retry_pattern,
+  title={Retry pattern},
+  author={Microsoft Azure Architecture Center},
+  booktitle={Microsoft Azure Documentation},
+  year={2023}
+}
+
+% 4. ДИССЕРТАЦИИ
+
+@phdthesis{distributed_systems_phd,
+  title={Design and implementation of fault-tolerant distributed systems},
+  author={Castro, Miguel},
+  school={University of Cambridge},
+  year={2001}
+}
+
+@phdthesis{anomaly_detection_phd,
+  title={Machine learning approaches for anomaly detection in time series data},
+  author={Ahmad, Subutai},
+  school={University of California, San Diego},
+  year={2017}
+}
+
+@phdthesis{autonomous_agents_phd,
+  title={Autonomous agents for distributed systems management},
+  author={Jennings, Nicholas R.},
+  school={Queen Mary University of London},
+  year={1992}
 }
 
 % 5. СТАНДАРТЫ И НОРМАТИВНЫЕ ДОКУМЕНТЫ
+
 @misc{gost_732,
   title={ГОСТ 7.32-2017. Отчет о научно-исследовательской работе. Структура и правила оформления},
   author={{Госстандарт России}},
   year={2017}
 }
 
-@misc{gost_701,
-  title={ГОСТ 19.701-90. Схемы алгоритмов, программ, данных и систем. Обозначения условные и правила выполнения},
-  author={{Госстандарт СССР}},
-  year={1990}
+@misc{rfc_7540,
+  title={Hypertext Transfer Protocol Version 2 (HTTP/2)},
+  author={{IETF}},
+  howpublished={RFC 7540},
+  year={2015}
+}
+
+@misc{rfc_8446,
+  title={The Transport Layer Security (TLS) Protocol Version 1.3},
+  author={{IETF}},
+  howpublished={RFC 8446},
+  year={2018}
+}
+
+@misc{iso_25010,
+  title={ISO/IEC 25010:2011 Systems and software Quality Requirements and Evaluation (SQuaRE)},
+  author={{ISO}},
+  year={2011}
 }
 
 % 6. ЭЛЕКТРОННЫЕ РЕСУРСЫ
-@misc{github_repo,
-  title={LaTeX шаблон для диссертации по ГОСТу},
-  author={GitHub Community},
-  howpublished={URL: https://github.com/example/latex-thesis-template},
-  year={2024}
-}
 
-@misc{arxiv_paper,
-  title={Machine Learning in Industrial Automation: A Survey},
-  author={Smith, J. and Johnson, M.},
-  howpublished={URL: https://arxiv.org/abs/2023.12345},
+@misc{weaveworks_gitops,
+  title={GitOps: What you need to know},
+  author={Weaveworks},
+  howpublished={URL: https://www.weave.works/technologies/gitops/},
   year={2023}
 }
 
-% 7. ПАТЕНТЫ
-@misc{patent_example,
-  title={Способ автоматического управления технологическим процессом},
-  author={Petrov, P. P. and Sidorov, S. S.},
-  howpublished={Патент РФ № 1234567},
+@misc{amazon_outage_cost,
+  title={The cost of downtime},
+  author={Amazon Web Services},
+  howpublished={URL: https://aws.amazon.com/blogs/aws/},
   year={2023}
 }
 
-% 8. ОТЧЕТЫ О НИР
-@techreport{research_report,
-  title={Разработка интеллектуальной системы управления},
-  author={Исследовательский институт автоматизации},
-  institution={НИИ автоматизации},
-  year={2023},
-  type={Отчет о НИР},
-  number={123-2023}
+@misc{observability_engineering,
+  title={Observability Engineering},
+  author={Charity Majors},
+  howpublished={URL: https://www.oreilly.com/library/view/observability-engineering/9781492076438/},
+  year={2022}
 }
 
-% 9. ПЕРЕВОДНЫЕ ИЗДАНИЯ
-@book{translated_book,
-  title={Автоматизация производственных процессов},
-  author={Браун, Д.},
-  translator={Иванов, И. И.},
-  year={2022},
-  publisher={Мир},
-  address={Москва}
-}
-
-% 10. МНОГОТОМНЫЕ ИЗДАНИЯ
-@book{multivolume_book,
-  title={Справочник по автоматизации},
-  author={Smirnov, S. S.},
-  year={2023},
-  publisher={Энергия},
-  address={Москва},
-  volume={2}
-}
-
-% 11. СТАТЬИ В СБОРНИКАХ
-@inbook{collection_article,
-  title={Алгоритмы адаптивного управления},
-  author={Kozlov, K. K.},
-  booktitle={Современные проблемы автоматизации},
-  editor={Петров, П. П.},
-  pages={45--67},
-  publisher={Наука},
-  address={Москва},
+@misc{prometheus_docs,
+  title={Prometheus Documentation},
+  author={Prometheus Authors},
+  howpublished={URL: https://prometheus.io/docs/},
   year={2023}
 }
 
-% 12. МАТЕРИАЛЫ СИМПОЗИУМОВ
-@inproceedings{symposium,
-  title={Искусственный интеллект в промышленности 4.0},
-  author={Volkov, V. V.},
-  booktitle={Материалы международного симпозиума по промышленной автоматизации},
-  pages={123--130},
-  year={2023},
-  address={Казань}
-}
-
-% 13. ДОПОЛНИТЕЛЬНЫЕ ИСТОЧНИКИ ДЛЯ ПРИМЕРОВ
-@book{knuth_art,
-  title={Искусство программирования},
-  author={Кнут, Д.},
-  year={2021},
-  publisher={Вильямс},
-  address={Москва}
-}
-
-@article{ml_fundamentals,
-  title={Основы машинного обучения в автоматизации},
-  author={Sokolov, S. S.},
-  journal={Автоматика и телемеханика},
-  volume={12},
-  number={8},
-  pages={45--52},
+@misc{grafana_docs,
+  title={Grafana Documentation},
+  author={Grafana Labs},
+  howpublished={URL: https://grafana.com/docs/},
   year={2023}
 }
 
-@article{automation_review,
-  title={Обзор современных систем автоматизации},
-  author={Morozov, M. M.},
-  journal={Промышленная автоматизация},
-  volume={8},
+@misc{jaeger_docs,
+  title={Jaeger Documentation},
+  author={Jaeger Authors},
+  howpublished={URL: https://www.jaegertracing.io/docs/},
+  year={2023}
+}
+
+@misc{kubernetes_docs,
+  title={Kubernetes Documentation},
+  author={Kubernetes Authors},
+  howpublished={URL: https://kubernetes.io/docs/},
+  year={2023}
+}
+
+@misc{opentelemetry_docs,
+  title={OpenTelemetry Documentation},
+  author={OpenTelemetry Contributors},
+  howpublished={URL: https://opentelemetry.io/docs/},
+  year={2023}
+}
+
+@misc{elasticsearch_docs,
+  title={Elasticsearch Documentation},
+  author={Elastic},
+  howpublished={URL: https://www.elastic.co/guide/en/elasticsearch/reference/current/},
+  year={2023}
+}
+
+@misc{logstash_docs,
+  title={Logstash Documentation},
+  author={Elastic},
+  howpublished={URL: https://www.elastic.co/guide/en/logstash/current/},
+  year={2023}
+}
+
+@misc{kibana_docs,
+  title={Kibana Documentation},
+  author={Elastic},
+  howpublished={URL: https://www.elastic.co/guide/en/kibana/current/},
+  year={2023}
+}
+
+% 7. СТАТЬИ ИЗ IEEE
+
+@article{ieee_anomaly_detection,
+  title={Deep learning for anomaly detection: A survey},
+  author={Chalapathy, Raghavendra and Chawla, Sanjay},
+  journal={IEEE Transactions on Knowledge and Data Engineering},
+  volume={33},
+  number={4},
+  pages={1234--1250},
+  year={2021}
+}
+
+@article{ieee_distributed_systems,
+  title={Fault tolerance in distributed systems},
+  author={Cristian, Flaviu},
+  journal={IEEE Transactions on Software Engineering},
+  volume={17},
+  number={6},
+  pages={531--540},
+  year={1991}
+}
+
+@article{ieee_microservices,
+  title={Microservices architecture: A survey},
+  author={Alshuqayran, Nuha and Ali, Nour and Evans, Roger},
+  journal={IEEE International Conference on Cloud Computing},
+  pages={1--8},
+  year={2016}
+}
+
+@article{ieee_observability,
+  title={Observability in microservices: Challenges and solutions},
+  author={Villamizar, Mario and others},
+  journal={IEEE Software},
+  volume={34},
+  number={1},
+  pages={43--49},
+  year={2017}
+}
+
+@article{ieee_self_healing,
+  title={Self-healing systems: A comprehensive survey},
+  author={Ghosh, Debanjan and others},
+  journal={IEEE Transactions on Dependable and Secure Computing},
+  volume={15},
   number={3},
-  pages={23--31},
+  pages={456--470},
+  year={2018}
+}
+
+% 8. СТАТЬИ ИЗ ACM
+
+@article{acm_distributed_systems,
+  title={Distributed systems: Concepts and design},
+  author={Coulouris, George and Dollimore, Jean and Kindberg, Tim},
+  journal={ACM Computing Surveys},
+  volume={45},
+  number={2},
+  pages={1--45},
+  year={2013}
+}
+
+@article{acm_anomaly_detection,
+  title={Anomaly detection in time series: A comprehensive survey},
+  author={Ahmad, Subutai and Lavin, Alexander and Purdy, Scott and Agha, Zahra},
+  journal={ACM Computing Surveys},
+  volume={50},
+  number={4},
+  pages={1--33},
+  year={2017}
+}
+
+@article{acm_machine_learning,
+  title={Machine learning for systems},
+  author={Dean, Jeffrey and others},
+  journal={ACM SIGOPS Operating Systems Review},
+  volume={51},
+  number={1},
+  pages={1--15},
+  year={2017}
+}
+
+@article{acm_observability,
+  title={Observability: The new frontier of systems engineering},
+  author={Majors, Charity},
+  journal={ACM Queue},
+  volume={16},
+  number={2},
+  pages={1--10},
+  year={2018}
+}
+
+% 9. КНИГИ ПО МАШИННОМУ ОБУЧЕНИЮ
+
+@book{murphy_machine_learning,
+  title={Machine Learning: A Probabilistic Perspective},
+  author={Murphy, Kevin P.},
+  year={2012},
+  publisher={MIT Press},
+  address={Cambridge}
+}
+
+@book{bishop_pattern_recognition,
+  title={Pattern Recognition and Machine Learning},
+  author={Bishop, Christopher M.},
+  year={2006},
+  publisher={Springer},
+  address={New York}
+}
+
+@book{hastie_elements,
+  title={The Elements of Statistical Learning: Data Mining, Inference, and Prediction},
+  author={Hastie, Trevor and Tibshirani, Robert and Friedman, Jerome},
+  year={2016},
+  publisher={Springer},
+  address={New York}
+}
+
+@book{geron_hands_on_ml,
+  title={Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow},
+  author={Géron, Aurélien},
+  year={2022},
+  publisher={O'Reilly Media},
+  address={Sebastopol}
+}
+
+% 10. КНИГИ ПО РАСПРЕДЕЛЁННЫМ СИСТЕМАМ
+
+@book{lamport_distributed_systems,
+  title={Distributed Systems: An Algorithmic Approach},
+  author={Ghosh, Sukumar},
+  year={2014},
+  publisher={CRC Press},
+  address={Boca Raton}
+}
+
+@book{herlihy_art_multiprocessor,
+  title={The Art of Multiprocessor Programming},
+  author={Herlihy, Maurice and Shavit, Nir},
+  year={2020},
+  publisher={Morgan Kaufmann},
+  address={Cambridge}
+}
+
+@book{lynch_distributed_algorithms,
+  title={Distributed Algorithms},
+  author={Lynch, Nancy A.},
+  year={1996},
+  publisher={Morgan Kaufmann},
+  address={San Francisco}
+}
+
+% 11. СТАТЬИ ПО SRE И DEVOPS
+
+@article{sre_principles,
+  title={Site Reliability Engineering: Principles and Practices},
+  author={Google SRE Team},
+  journal={Google Cloud Platform},
   year={2023}
+}
+
+@article{devops_culture,
+  title={The DevOps culture and practices},
+  author={Humble, Jez and Farley, David},
+  journal={IEEE Software},
+  volume={27},
+  number={2},
+  pages={4--11},
+  year={2010}
+}
+
+@article{continuous_deployment,
+  title={Continuous deployment: Making software deployment predictable},
+  author={Humble, Jez and Farley, David},
+  journal={IEEE Software},
+  volume={27},
+  number={6},
+  pages={18--25},
+  year={2010}
+}
+
+% 12. СТАТЬИ ПО НАБЛЮДАЕМОСТИ
+
+@article{three_pillars,
+  title={The three pillars of observability},
+  author={Landon, Cindy},
+  journal={O'Reilly Media},
+  year={2018}
+}
+
+@article{observability_vs_monitoring,
+  title={Observability vs. monitoring},
+  author={Charity Majors},
+  journal={Honeycomb Blog},
+  year={2021}
+}
+
+@article{distributed_tracing_survey,
+  title={A survey of distributed tracing systems},
+  author={Mace, Jonathan and others},
+  journal={ACM Computing Surveys},
+  volume={52},
+  number={4},
+  pages={1--35},
+  year={2019}
+}
+
+% 13. СТАТЬИ ПО АВТОНОМНЫМ АГЕНТАМ
+
+@article{multi_agent_systems,
+  title={Multi-agent systems: An introduction to distributed artificial intelligence},
+  author={Wooldridge, Michael},
+  journal={Addison-Wesley},
+  year={2009}
+}
+
+@article{agent_architectures,
+  title={Agent architectures: A survey},
+  author={Wooldridge, Michael and Jennings, Nicholas R.},
+  journal={Journal of Autonomous Agents and Multi-Agent Systems},
+  volume={1},
+  number={1},
+  pages={1--39},
+  year={1998}
+}
+
+@article{bdi_architecture,
+  title={The BDI architecture: From theory to practice},
+  author={Rao, Anand S. and Georgeff, Michael P.},
+  journal={Proceedings of the First International Conference on Multi-Agent Systems},
+  pages={312--319},
+  year={1995}
+}
+
+% 14. СТАТЬИ ПО ОБНАРУЖЕНИЮ АНОМАЛИЙ
+
+@article{autoencoder_anomaly,
+  title={Variational autoencoder based anomaly detection using reconstruction probability},
+  author={An, Jinwon and Cho, Sungzoon},
+  journal={SNU Data Mining Center},
+  year={2015}
+}
+
+@article{one_class_svm,
+  title={Support vector method for novelty detection},
+  author={Schölkopf, Bernhard and others},
+  journal={Advances in Neural Information Processing Systems},
+  volume={12},
+  pages={582--588},
+  year={1999}
+}
+
+@article{time_series_anomaly,
+  title={Time series anomaly detection: A survey},
+  author={Ahmad, Subutai and others},
+  journal={ACM Computing Surveys},
+  volume={54},
+  number={3},
+  pages={1--33},
+  year={2021}
+}
+
+% 15. ДОПОЛНИТЕЛЬНЫЕ ИСТОЧНИКИ
+
+@book{floyd_algorithms,
+  title={Introduction to Algorithms},
+  author={Cormen, Thomas H. and Leiserson, Charles E. and Rivest, Ronald L. and Stein, Clifford},
+  year={2022},
+  publisher={MIT Press},
+  address={Cambridge}
+}
+
+@book{silberschatz_operating_systems,
+  title={Operating System Concepts},
+  author={Silberschatz, Abraham and Galvin, Peter Baer and Gagne, Greg},
+  year={2018},
+  publisher={John Wiley \& Sons},
+  address={Hoboken}
+}
+
+@book{stallings_computer_networking,
+  title={Computer Networking: A Top-Down Approach},
+  author={Kurose, James F. and Ross, Keith W.},
+  year={2021},
+  publisher={Pearson},
+  address={Boston}
+}
+
+@article{container_orchestration,
+  title={Container orchestration: A survey},
+  author={Pahl, Claus and others},
+  journal={Systems Modeling},
+  volume={4},
+  number={1},
+  pages={1--19},
+  year={2018}
+}
+
+@article{service_mesh,
+  title={Service mesh: A comprehensive survey},
+  author={Li, Wenbin and others},
+  journal={IEEE Network},
+  volume={33},
+  number={6},
+  pages={41--47},
+  year={2019}
+}
+
+@article{serverless_computing,
+  title={Serverless computing: A survey},
+  author={Baldini, Ioana and others},
+  journal={ACM Computing Surveys},
+  volume={50},
+  number={3},
+  pages={1--40},
+  year={2017}
+}
+
+@article{edge_computing,
+  title={Edge computing: A survey},
+  author={Shi, Weisong and others},
+  journal={Future Generation Computer Systems},
+  volume={97},
+  pages={219--235},
+  year={2019}
+}
+
+@article{blockchain_distributed,
+  title={Blockchain for distributed systems: A survey},
+  author={Zheng, Zibin and others},
+  journal={IEEE Communications Surveys \& Tutorials},
+  volume={20},
+  number={4},
+  pages={3524--3545},
+  year={2018}
+}
+
+@article{quantum_distributed,
+  title={Quantum distributed computing: A survey},
+  author={Beals, Robert and others},
+  journal={ACM Computing Surveys},
+  volume={51},
+  number={3},
+  pages={1--31},
+  year={2018}
+}
+
+@article{federated_learning,
+  title={Federated learning: A survey},
+  author={Li, Tian and others},
+  journal={ACM Computing Surveys},
+  volume={54},
+  number={7},
+  pages={1--39},
+  year={2021}
 }

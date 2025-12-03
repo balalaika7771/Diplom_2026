@@ -1,322 +1,255 @@
-% Приложение 3 - Примеры для автоматики
+\chapter{Листинги кода}
 
-\chapter{Примеры схем и диаграмм для автоматики}
+\section{Реализация модуля обнаружения аномалий}
 
-\section{Блок-схемы алгоритмов}
+\begin{lstlisting}[language=Java, caption={Модуль обнаружения аномалий на основе LSTM}, label=lst:anomaly_detector, escapeinside={(*@}{@*)}]
+package com.autonomous.agents.agents;
 
-\subsection{Алгоритм ПИД-регулятора}
+import org.springframework.stereotype.Service;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.layers.LSTM;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
+import org.nd4j.linalg.activations.Activation;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 
-\begin{algorithm}[H]
-\caption{Алгоритм ПИД-регулятора}
-\label{alg:pid}
-\begin{algorithmic}[1]
-\STATE \textbf{Входные параметры:} $K_p$, $K_i$, $K_d$, $T_s$, $e_{prev}$, $I_{prev}$
-\STATE \textbf{Входной сигнал:} $e(t)$ - ошибка управления
-\STATE \textbf{Выходной сигнал:} $u(t)$ - управляющее воздействие
-\STATE
-\STATE $P = K_p \cdot e(t)$ \COMMENT{Пропорциональная составляющая}
-\STATE $I = I_{prev} + K_i \cdot e(t) \cdot T_s$ \COMMENT{Интегральная составляющая}
-\STATE $D = K_d \cdot \frac{e(t) - e_{prev}}{T_s}$ \COMMENT{Дифференциальная составляющая}
-\STATE
-\STATE $u(t) = P + I + D$ \COMMENT{Выходной сигнал ПИД-регулятора}
-\STATE
-\STATE $e_{prev} = e(t)$ \COMMENT{Сохранение предыдущего значения ошибки}
-\STATE $I_{prev} = I$ \COMMENT{Сохранение интегральной составляющей}
-\STATE
-\RETURN $u(t)$
-\end{algorithmic}
-\end{algorithm}
+import java.util.List;
 
-\subsection{Блок-схема алгоритма управления (по ГОСТ 19.701-90)}
-
-\autoblockdiagram{%
-    % Узлы по ГОСТ 19.701-90
-    \node (start) [startstop] {Начало};
-    \node (input) [io, below of=start] {Ввод параметров\\$K_p$, $K_i$, $K_d$};
-    \node (read) [io, below of=input] {Чтение ошибки\\$e(t)$};
-    \node (calc) [process, below of=read] {Вычисление\\$u(t) = P + I + D$};
-    \node (output) [io, below of=calc] {Выдача управляющего\\сигнала $u(t)$};
-    \node (check) [decision, below of=output] {Конец\\работы?};
-    \node (stop) [startstop, below of=check] {Конец};
+@Service
+public class AnomalyDetectorService {
+    private static final int WINDOW_SIZE = 60;
+    private MultiLayerNetwork model;
     
-    % Стрелки
-    \draw [arrow] (start) -- (input);
-    \draw [arrow] (input) -- (read);
-    \draw [arrow] (read) -- (calc);
-    \draw [arrow] (calc) -- (output);
-    \draw [arrow] (output) -- (check);
-    \draw [arrow] (check) -- node[anchor=east] {Да} (stop);
-    \draw [arrow] (check) -- node[anchor=south] {Нет} ++(-4,0) |- (read);
-}{Блок-схема алгоритма ПИД-регулятора}{fig:pid_algorithm}
-
-\section{Схемы систем управления}
-
-\subsection{Структурная схема системы автоматического управления (по ГОСТ 2.701-2008)}
-
-\autostructure{%
-    % Узлы по ГОСТ 2.701-2008
-    \node (input) [block] {Задающее\\воздействие\\$r(t)$};
-    \node (sum1) [sum, right of=input, node distance=2.5cm] {+};
-    \node (controller) [block, right of=sum1, node distance=2.5cm] {ПИД-\\регулятор};
-    \node (plant) [block, right of=controller, node distance=2.5cm] {Объект\\управления};
-    \node (output) [block, right of=plant, node distance=2.5cm] {Выходная\\величина\\$y(t)$};
-    \node (feedback) [block, below of=plant, node distance=2.5cm] {Обратная\\связь};
-    \node (sum2) [sum, left of=feedback, node distance=2.5cm] {-};
-    
-    % Стрелки
-    \draw [arrow] (input) -- (sum1);
-    \draw [arrow] (sum1) -- node[anchor=south] {$e(t)$} (controller);
-    \draw [arrow] (controller) -- node[anchor=south] {$u(t)$} (plant);
-    \draw [arrow] (plant) -- (output);
-    \draw [arrow] (output) -- (feedback);
-    \draw [arrow] (feedback) -- (sum2);
-    \draw [arrow] (sum2) -- (sum1);
-}{Структурная схема системы автоматического управления}{fig:control_system}
-
-\subsection{Функциональная схема системы управления температурой (по ГОСТ 2.701-2008)}
-
-\autofunctional{%
-    % Узлы по ГОСТ 2.701-2008
-    \node (setpoint) [block] {Задание\\температуры\\$T_{set}$};
-    \node (controller) [block, right of=setpoint, node distance=2.5cm] {ПИД-\\контроллер};
-    \node (heater) [actuator, right of=controller, node distance=2.5cm] {Нагреватель};
-    \node (process) [block, right of=heater, node distance=2.5cm] {Технологический\\процесс};
-    \node (thermometer) [sensor, below of=process, node distance=2cm] {Термометр};
-    \node (feedback) [block, left of=thermometer, node distance=2.5cm] {Обратная\\связь};
-    
-    % Стрелки
-    \draw [arrow] (setpoint) -- (controller);
-    \draw [arrow] (controller) -- node[anchor=south] {$PWM$} (heater);
-    \draw [arrow] (heater) -- node[anchor=south] {$Q$} (process);
-    \draw [arrow] (process) -- (thermometer);
-    \draw [arrow] (thermometer) -- node[anchor=south] {$T_{meas}$} (feedback);
-    \draw [arrow] (feedback) -- (controller);
-}{Функциональная схема системы управления температурой}{fig:temperature_control}
-
-\section{Временные диаграммы}
-
-\subsection{Временная диаграмма ПИД-регулятора (по ГОСТ 2.701-2008)}
-
-\autotimingdiagram{%
-    % Сетка по ГОСТ 2.701-2008
-    \draw[grid] (0,0) grid (10,4);
-    
-    % Оси координат
-    \draw[axis] (0,0) -- (10,0) node[anchor=north] {Время, с};
-    \draw[axis] (0,0) -- (0,4) node[anchor=east] {Сигнал};
-    
-    % Подписи осей
-    \node[label, anchor=north] at (5,-0.5) {Время, с};
-    \node[label, anchor=east, rotate=90] at (-0.5,2) {Сигнал};
-    
-    % Сигналы
-    \draw[signal, blue] (0,2) -- (2,2) -- (2,3) -- (4,3) -- (4,1) -- (6,1) -- (6,2.5) -- (8,2.5) -- (8,2) -- (10,2);
-    \draw[signal, red] (0,2) -- (1,2.2) -- (2,2.8) -- (3,2.5) -- (4,1.8) -- (5,1.2) -- (6,1.8) -- (7,2.2) -- (8,2.1) -- (9,2.05) -- (10,2);
-    
-    % Легенда
-    \node[label, anchor=west, blue] at (0.5,3.5) {Задающее воздействие};
-    \node[label, anchor=west, red] at (0.5,3.2) {Выходная величина};
-    
-    % Подписи
-    \node[label, anchor=south] at (2,3.1) {Ступенька};
-    \node[label, anchor=south] at (4,3.1) {Ступенька};
-    \node[label, anchor=south] at (6,2.6) {Ступенька};
-}{Временная диаграмма работы ПИД-регулятора}{fig:pid_timing}
-
-\section{Логические схемы}
-
-\subsection{Логическая схема системы безопасности (по ГОСТ 2.701-2008)}
-
-\autocontrolscheme{%
-    % Узлы по ГОСТ 2.701-2008
-    \node (sensor1) [block] {Датчик 1};
-    \node (sensor2) [block, below of=sensor1, node distance=1.5cm] {Датчик 2};
-    \node (sensor3) [block, below of=sensor2, node distance=1.5cm] {Датчик 3};
-    
-    \node (and1) [block, right of=sensor1, node distance=2.5cm] {И};
-    \node (and2) [block, right of=sensor2, node distance=2.5cm] {И};
-    \node (or1) [block, right of=and1, node distance=2.5cm] {ИЛИ};
-    \node (not1) [block, right of=or1, node distance=2.5cm] {НЕ};
-    
-    \node (alarm) [block, right of=not1, node distance=2.5cm] {Сигнал\\тревоги};
-    
-    % Стрелки
-    \draw [arrow] (sensor1) -- (and1);
-    \draw [arrow] (sensor2) -- (and1);
-    \draw [arrow] (sensor2) -- (and2);
-    \draw [arrow] (sensor3) -- (and2);
-    \draw [arrow] (and1) -- (or1);
-    \draw [arrow] (and2) -- (or1);
-    \draw [arrow] (or1) -- (not1);
-    \draw [arrow] (not1) -- (alarm);
-}{Логическая схема системы безопасности}{fig:safety_logic}
-
-\section{Математические модели}
-
-\subsection{Передаточная функция системы}
-
-Для системы управления с ПИД-регулятором передаточная функция имеет вид:
-
-\begin{equation}
-W(s) = \frac{K_p + K_i \frac{1}{s} + K_d s}{1 + \frac{K_p + K_i \frac{1}{s} + K_d s}{T s + 1}}
-\end{equation}
-
-где:
-\begin{itemize}
-    \item $K_p$ - коэффициент пропорционального усиления
-    \item $K_i$ - коэффициент интегрального усиления  
-    \item $K_d$ - коэффициент дифференциального усиления
-    \item $T$ - постоянная времени объекта управления
-\end{itemize}
-
-\subsection{Дискретная модель ПИД-регулятора}
-
-В дискретном виде алгоритм ПИД-регулятора записывается как:
-
-\begin{equation}
-u(k) = K_p e(k) + K_i T_s \sum_{i=0}^{k} e(i) + K_d \frac{e(k) - e(k-1)}{T_s}
-\end{equation}
-
-где $T_s$ - период дискретизации.
-
-\section{Примеры расчетов}
-
-\subsection{Расчет параметров ПИД-регулятора}
-
-Для объекта управления с передаточной функцией $W_{\text{ob}}(s) = \frac{1}{s+1}$ параметры ПИД-регулятора рассчитываются по методу Зиглера-Николса:
-
-\begin{align}
-K_p &= 0.6 \cdot K_{\text{cr}} = 0.6 \cdot 2 = 1.2 \\
-K_i &= \frac{2K_p}{T_{\text{cr}}} = \frac{2 \cdot 1.2}{4} = 0.6 \\
-K_d &= \frac{K_p T_{\text{cr}}}{8} = \frac{1.2 \cdot 4}{8} = 0.6
-\end{align}
-
-где $K_{\text{cr}} = 2$ - критический коэффициент усиления, $T_{\text{cr}} = 4$ с - критический период колебаний.
-
-\section{Программная реализация}
-
-\subsection{Код ПИД-регулятора на C++}
-
-\begin{CodeBlock}{C++}{Реализация ПИД-регулятора}{lst:pid_cpp}
-class PIDController {
-private:
-    double Kp, Ki, Kd;           // Parameters of regulator
-    double Ts;                   // Sampling period
-    double prev_error;           // Previous error
-    double integral;             // Integral component
-    
-public:
-    PIDController(double kp, double ki, double kd, double ts) 
-        : Kp(kp), Ki(ki), Kd(kd), Ts(ts), prev_error(0), integral(0) {}
-    
-    double calculate(double error) {
-        // Proportional component
-        double proportional = Kp * error;
-        
-        // Integral component
-        integral += error * Ts;
-        double integral_term = Ki * integral;
-        
-        // Derivative component
-        double derivative = (error - prev_error) / Ts;
-        double derivative_term = Kd * derivative;
-        
-        // Output signal
-        double output = proportional + integral_term + derivative_term;
-        
-        // Save current error
-        prev_error = error;
-        
-        return output;
+    public AnomalyDetectorService() {
+        this.model = buildModel();
     }
     
-    void reset() {
-        prev_error = 0;
-        integral = 0;
+    (*@// Построение модели LSTM для предсказания временных рядов@*)
+    private MultiLayerNetwork buildModel() {
+        MultiLayerConfiguration conf = new org.deeplearning4j.nn.conf.NeuralNetConfiguration.Builder()
+            .seed(123)
+            .list()
+            .layer(new LSTM.Builder()
+                .nIn(1)
+                .nOut(50)
+                .activation(Activation.TANH)
+                .build())
+            .layer(new LSTM.Builder()
+                .nIn(50)
+                .nOut(50)
+                .activation(Activation.TANH)
+                .build())
+            .layer(new DenseLayer.Builder()
+                .nIn(50)
+                .nOut(25)
+                .activation(Activation.RELU)
+                .build())
+            .layer(new RnnOutputLayer.Builder(LossFunctions.LossFunction.MSE)
+                .nIn(25)
+                .nOut(1)
+                .activation(Activation.IDENTITY)
+                .build())
+            .build();
+        
+        MultiLayerNetwork network = new MultiLayerNetwork(conf);
+        network.init();
+        return network;
     }
-};
-\end{CodeBlock}
-
-\subsection{Код системы управления на Python}
-
-\begin{CodeBlock}{Python}{Система управления температурой}{lst:temp_control_python}
-import time
-import numpy as np
-import matplotlib.pyplot as plt
-
-class TemperatureController:
-    def __init__(self, kp, ki, kd, setpoint, dt):
-        self.kp = kp
-        self.ki = ki  
-        self.kd = kd
-        self.setpoint = setpoint
-        self.dt = dt
+    
+    (*@// Обучение модели на исторических данных@*)
+    public void train(List<Double> data) {
+        (*@// Подготовка данных для обучения@*)
+        (*@// Реализация подготовки данных и обучения модели@*)
+    }
+    
+    (*@// Обнаружение аномалии в последовательности@*)
+    public AnomalyResult detect(List<Double> sequence) {
+        (*@// Предсказание следующего значения@*)
+        INDArray input = prepareInput(sequence);
+        INDArray prediction = model.output(input);
         
-        self.prev_error = 0
-        self.integral = 0
-        self.prev_time = time.time()
+        (*@// Вычисление ошибки предсказания@*)
+        double actualValue = sequence.get(sequence.size() - 1);
+        double predictedValue = prediction.getDouble(0);
+        double error = Math.abs(actualValue - predictedValue);
         
-    def update(self, current_temp):
-        current_time = time.time()
-        dt = current_time - self.prev_time
+        (*@// Порог аномалии: 2 стандартных отклонения@*)
+        double threshold = calculateStdDev(sequence) * 2;
+        boolean isAnomaly = error > threshold;
         
-        if dt <= 0:
-            dt = self.dt
+        return new AnomalyResult(isAnomaly, error);
+    }
+    
+    private INDArray prepareInput(List<Double> sequence) {
+        (*@// Преобразование последовательности в INDArray@*)
+        double[] array = sequence.stream()
+            .mapToDouble(Double::doubleValue)
+            .toArray();
+        return Nd4j.create(array).reshape(1, array.length, 1);
+    }
+    
+    private double calculateStdDev(List<Double> values) {
+        (*@// Вычисление стандартного отклонения@*)
+        double mean = values.stream()
+            .mapToDouble(Double::doubleValue)
+            .average()
+            .orElse(0.0);
+        
+        double variance = values.stream()
+            .mapToDouble(v -> Math.pow(v - mean, 2))
+            .average()
+            .orElse(0.0);
+        
+        return Math.sqrt(variance);
+    }
+    
+    public static class AnomalyResult {
+        private final boolean isAnomaly;
+        private final double error;
+        
+        public AnomalyResult(boolean isAnomaly, double error) {
+            this.isAnomaly = isAnomaly;
+            this.error = error;
+        }
+        
+        public boolean isAnomaly() { return isAnomaly; }
+        public double getError() { return error; }
+    }
+}
+\end{lstlisting}
+
+\section{Реализация модуля диагностики}
+
+\begin{lstlisting}[language=Java, caption={Модуль построения причинно-следственного графа}, label=lst:diagnostic_engine, escapeinside={(*@}{@*)}]
+package com.autonomous.agents.agents;
+
+import org.springframework.stereotype.Service;
+import org.jgrapht.Graph;
+import org.jgrapht.graph.DefaultDirectedGraph;
+import org.jgrapht.graph.DefaultEdge;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class DiagnosticEngineService {
+    (*@// Граф причинно-следственных связей@*)
+    private Graph<String, DefaultEdge> causalGraph;
+    
+    public DiagnosticEngineService() {
+        this.causalGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
+    }
+    
+    (*@// Построение причинно-следственного графа@*)
+    public void buildCausalGraph(
+            Map<String, List<Double>> metrics,
+            List<LogEntry> logs,
+            List<Trace> traces) {
+        
+        (*@// Анализ метрик на наличие аномалий@*)
+        for (Map.Entry<String, List<Double>> entry : metrics.entrySet()) {
+            if (isAnomalous(entry.getValue())) {
+                causalGraph.addVertex(entry.getKey());
+            }
+        }
+        
+        (*@// Анализ логов на наличие ошибок@*)
+        for (LogEntry logEntry : logs) {
+            if ("ERROR".equals(logEntry.getLevel())) {
+                String service = logEntry.getService();
+                causalGraph.addVertex(service);
+                
+                (*@// Связь с метриками@*)
+                for (String metric : metrics.keySet()) {
+                    if (isRelated(service, metric)) {
+                        causalGraph.addEdge(metric, service);
+                    }
+                }
+            }
+        }
+        
+        (*@// Анализ трейсов для построения связей@*)
+        for (Trace trace : traces) {
+            addTraceRelations(trace);
+        }
+    }
+    
+    (*@// Поиск корневых причин@*)
+    public List<String> findRootCause() {
+        List<String> rootCauses = new ArrayList<>();
+        
+        (*@// Корневая причина - узел без входящих рёбер@*)
+        for (String node : causalGraph.vertexSet()) {
+            if (causalGraph.inDegreeOf(node) == 0) {
+                rootCauses.add(node);
+            }
+        }
+        
+        return rootCauses;
+    }
+    
+    (*@// Проверка на аномальность по правилу 3 сигм@*)
+    private boolean isAnomalous(List<Double> values) {
+        double mean = values.stream()
+            .mapToDouble(Double::doubleValue)
+            .average()
+            .orElse(0.0);
+        
+        double variance = values.stream()
+            .mapToDouble(v -> Math.pow(v - mean, 2))
+            .average()
+            .orElse(0.0);
+        
+        double std = Math.sqrt(variance);
+        double lastValue = values.get(values.size() - 1);
+        
+        return Math.abs(lastValue - mean) > 2 * std;
+    }
+    
+    (*@// Проверка связи между сервисом и метрикой@*)
+    private boolean isRelated(String service, String metric) {
+        (*@// Упрощённая логика проверки связи@*)
+        String serviceLower = service.toLowerCase();
+        String metricLower = metric.toLowerCase();
+        return serviceLower.contains(metricLower) || 
+               metricLower.contains(serviceLower);
+    }
+    
+    (*@// Добавление связей из трейса@*)
+    private void addTraceRelations(Trace trace) {
+        List<Span> spans = trace.getSpans();
+        
+        (*@// Связи между последовательными спанами@*)
+        for (int i = 0; i < spans.size() - 1; i++) {
+            String sourceService = spans.get(i).getService();
+            String targetService = spans.get(i + 1).getService();
             
-        error = self.setpoint - current_temp
-        
-        # Proportional component
-        proportional = self.kp * error
-        
-        # Integral component
-        self.integral += error * dt
-        integral_term = self.ki * self.integral
-        
-        # Derivative component
-        derivative = (error - self.prev_error) / dt
-        derivative_term = self.kd * derivative
-        
-        # Output signal (heater power 0-100%)
-        output = proportional + integral_term + derivative_term
-        output = np.clip(output, 0, 100)
-        
-        # Update variables
-        self.prev_error = error
-        self.prev_time = current_time
-        
-        return output
-
-# Usage example
-def simulate_temperature_control():
-    controller = TemperatureController(kp=2.0, ki=0.5, kd=0.1, 
-                                     setpoint=50.0, dt=0.1)
+            causalGraph.addVertex(sourceService);
+            causalGraph.addVertex(targetService);
+            causalGraph.addEdge(sourceService, targetService);
+        }
+    }
     
-    # Control object simulation
-    temp = 20.0  # Initial temperature
-    temp_history = []
-    time_history = []
-    
-    for t in np.arange(0, 100, 0.1):
-        # Calculate control action
-        power = controller.update(temp)
+    (*@// Вспомогательные классы@*)
+    public static class LogEntry {
+        private String level;
+        private String service;
         
-        # Object model (simple)
-        temp += (power - (temp - 20)) * 0.01
-        
-        temp_history.append(temp)
-        time_history.append(t)
+        public String getLevel() { return level; }
+        public String getService() { return service; }
+    }
     
-    # Plot graph
-    plt.figure(figsize=(10, 6))
-    plt.plot(time_history, temp_history, 'b-', label='Temperature')
-    plt.axhline(y=50, color='r', linestyle='--', label='Setpoint')
-    plt.xlabel('Time, s')
-    plt.ylabel('Temperature, C')
-    plt.legend()
-    plt.grid(True)
-    plt.title('PID Controller Result')
-    plt.show()
-
-if __name__ == "__main__":
-    simulate_temperature_control()
-\end{CodeBlock}
+    public static class Trace {
+        private List<Span> spans;
+        public List<Span> getSpans() { return spans; }
+    }
+    
+    public static class Span {
+        private String service;
+        public String getService() { return service; }
+    }
+}
+\end{lstlisting}
