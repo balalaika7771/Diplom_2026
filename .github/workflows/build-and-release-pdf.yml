@@ -12,16 +12,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up LaTeX and build PDF
-        uses: xu-cheng/latex-action@v4
-        with:
-          root_file: main.tex
+      - name: Install TeX Live and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-lang-cyrillic \
+            texlive-bibtex-extra \
+            texlive-fonts-extra \
+            texlive-science \
+            texlive-pictures \
+            texlive-luatex \
+            biber \
+            make
+
+      - name: Generate chapter lists and build PDF
+        run: |
+          make
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
         with:
           name: dissertation-pdf
-          path: main.pdf
+          path: build/main.pdf
 
       - name: Create GitHub Release with PDF
         uses: softprops/action-gh-release@v2
@@ -32,6 +46,6 @@ jobs:
           draft: false
           prerelease: true
           files: |
-            main.pdf
+            build/main.pdf
 
 
