@@ -50,7 +50,7 @@ D(M_i, M_j) = \begin{cases}
 
 Архитектура прототипа следует принципу разделения ответственности: модули \texttt{agents} (AnomalyDetectorService, DiagnosticEngineService, RecoveryExecutorService), \texttt{data} (DataCollectorService, DataProcessorService), \texttt{orchestrator} (консенсус агентов), \texttt{models} (LstmModel, IsolationForestModel) реализуют соответствующие подсистемы. Конфигурация описана в \texttt{application.yml}, сборка — Maven. Каждая подсистема вынесена в отдельный пакет, что позволяет независимо развёртывать, тестировать и масштабировать функциональные блоки.
 
-\subsection{Модуль сбора и нормализации данных (\texttt{data})}
+\subsection{Модуль сбора и нормализации данных}
 
 Модуль \texttt{data} инкапсулирует интеграцию с внешними системами наблюдаемости: Prometheus (метрики), Elasticsearch (логи), Jaeger (трейсы). Сервис \texttt{DataCollectorService} реализует периодический и событийный опрос этих источников, приводя данные к унифицированному формату
 \[
@@ -73,7 +73,7 @@ Collector преобразует их в записи
 \]
 что позволяет далее связывать метрики и логи по полям \(\text{source}\) и \(\text{trace\_id}\) при построении диагностического графа.
 
-\subsection{Модуль обнаружения аномалий (\texttt{agents: AnomalyDetectorService})}
+\subsection{Модуль обнаружения аномалий}
 
 Сервис \texttt{AnomalyDetectorService} реализует связку простых статистических критериев и LSTM-модели для потокового анализа временных рядов метрик. В коде поддерживаются:
 \begin{itemize}
@@ -95,7 +95,7 @@ Collector преобразует их в записи
 \]
 которое передаётся в Diagnostic Engine и далее по цепочке агентов.
 
-\subsection{Модуль диагностического графа (\texttt{agents: DiagnosticEngineService})}
+\subsection{Модуль диагностического графа}
 
 Модуль \texttt{DiagnosticEngineService} строит причинно-следственный граф инцидента по совокупности метрик, логов и трейсов. Реализация опирается на библиотеку JGraphT: вершины графа соответствуют сервисам и отдельным типам событий, рёбра — вероятностным причинным связям, вычисляемым по признакам времени, корреляции и топологии трейсов. На основе формулы~(\ref{eq:root_cause_impl}) модуль ранжирует кандидатов на корневую причину и формирует структуру \texttt{DiagnosisReport}, содержащую:
 \begin{itemize}
@@ -136,7 +136,7 @@ Collector преобразует их в записи
 \]
 как основной маршрут распространения проблемы. В прототипе такая структура графа и вероятности формируются программно на основе реальных метрик и трейсов из кластера Kubernetes.
 
-\subsection{Модуль оркестрации и исполнения (\texttt{agents: Orchestrator, RecoveryExecutorService})}
+\subsection{Модуль оркестрации и исполнения}
 
 Модуль \texttt{orchestrator} реализует консенсус агентов и выбор действий восстановления. На вход он получает набор рекомендаций от Diagnostic Engine, LLM-агента и rule-based политик, а на выходе формирует план действий \texttt{RecoveryPlan} с приоритетами и уровнем доверия. \texttt{RecoveryExecutorService} преобразует план в конкретные операции над Kubernetes-кластером (масштабирование \texttt{Deployment}, изменение \texttt{ConfigMap}, включение/выключение circuit breaker в сервисах) через Kubernetes Client и дополнительные REST/gRPC-интерфейсы. Все действия проходят через модуль Safe Executor, реализующий критерии риска и механизмы отката.
 
@@ -727,7 +727,7 @@ P(\text{success}|a, s) = \prod_{i=1}^{k} P_i(\text{success}|a, s)
 \label{fig:prototype_interaction}
 \end{figure}
 
-\section{Параметры конфигурации: математическая модель настройки}
+\section{Параметры конфигурации}
 
 Параметры системы определяют поведение математических моделей.
 
