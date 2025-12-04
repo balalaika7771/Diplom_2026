@@ -38,6 +38,103 @@ agent:
       requires_approval: true # Operator approval required
 \end{lstlisting}
 
+\subsection{Конфигурация прототипа (application.yml)}
+
+\begin{lstlisting}[caption={Фрагмент конфигурации прототипа}, label=lst:prototype_application_yaml]
+server:
+  port: 8080
+
+spring:
+  application:
+    name: autonomous-agents
+
+  datasource:
+    url: jdbc:postgresql://db:5432/agents
+    username: agents
+    password: agents
+
+observability:
+  prometheus:
+    url: http://prometheus:9090
+  elasticsearch:
+    url: http://elasticsearch:9200
+    index: logs-*
+  jaeger:
+    url: http://jaeger:16686
+
+kafka:
+  bootstrapServers: kafka:9092
+  topics:
+    anomalies: anomalies-topic
+    diagnoses: diagnoses-topic
+
+redis:
+  host: redis
+  port: 6379
+
+anomaly:
+  threshold: 0.85
+  windowSize: 60
+
+recovery:
+  maxActionsPerCycle: 5
+  safety:
+    riskThreshold: 0.1
+    successThreshold: 0.8
+\end{lstlisting}
+
+\subsection{Манифесты Kubernetes для развертывания агентов}
+
+\begin{lstlisting}[caption={Deployment для сервиса обнаружения аномалий}, label=lst:k8s_anomaly_deployment]
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anomaly-detector
+  labels:
+    app: autonomous-agents
+    component: anomaly-detector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: autonomous-agents
+      component: anomaly-detector
+  template:
+    metadata:
+      labels:
+        app: autonomous-agents
+        component: anomaly-detector
+    spec:
+      containers:
+        - name: anomaly-detector
+          image: registry.example.com/agents/anomaly-detector:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: agents-config
+            - secretRef:
+                name: agents-secrets
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Service для доступа к сервису обнаружения аномалий}, label=lst:k8s_anomaly_service]
+apiVersion: v1
+kind: Service
+metadata:
+  name: anomaly-detector
+  labels:
+    app: autonomous-agents
+    component: anomaly-detector
+spec:
+  selector:
+    app: autonomous-agents
+    component: anomaly-detector
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+\end{lstlisting}
+
 \section{Примеры метрик}
 
 В данном разделе представлены примеры метрик, собираемых системой для анализа.
@@ -54,4 +151,20 @@ agent:
   "value": [1642234567.890, "0.125"],  // [timestamp, value]
   "timestamp": 1642234567890           // Timestamp
 }
+\end{lstlisting}
+
+\subsection{Примеры алертов Prometheus}
+
+\begin{lstlisting}[caption={Пример правила алерта Prometheus}, label=lst:prometheus_alert]
+groups:
+  - name: autonomous-agents.rules
+    rules:
+      - alert: HighCPULoad
+        expr: avg_over_time(container_cpu_usage_seconds_total{service="payment-service"}[5m]) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU load on payment-service"
+          description: "CPU usage has been above 90% for more than 5 minutes."
 \end{lstlisting}

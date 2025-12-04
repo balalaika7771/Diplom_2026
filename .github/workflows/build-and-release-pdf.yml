@@ -43,8 +43,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: pdf-${{ github.sha }}
-          name: PDF build ${{ github.sha }}
+          tag_name: pdf-${{ github.run_id }}-${{ github.run_number }}
+          name: PDF build ${{ github.run_id }}-${{ github.run_number }} (${{ github.event.head_commit.timestamp || github.run_id }})
           draft: false
           prerelease: true
           files: |

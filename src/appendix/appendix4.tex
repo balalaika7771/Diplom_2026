@@ -75,3 +75,65 @@
     \item Постепенное восстановление соединений
 \end{itemize}
 
+\subsection{Сценарий 3: Прогнозируемая деградация производительности}
+
+\textbf{Симптомы:}
+\begin{itemize}
+    \item Устойчивый рост latency ключевого эндпоинта (\texttt{/checkout}) без резкого скачка ошибок
+    \item Прогноз LSTM показывает превышение порога SLA в ближайшие 10 минут
+\end{itemize}
+
+\textbf{Пример метрик:}
+\begin{itemize}
+    \item Текущее значение \(\text{Latency}_{\text{checkout}}(t) = 280\) мс при пороге SLA 300 мс
+    \item Прогноз \(\hat{\text{Latency}}_{\text{checkout}}(t+5\ \text{мин}) = 340\) мс
+\end{itemize}
+
+\textbf{Диагностика:}
+\begin{itemize}
+    \item AnomalyDetector фиксирует предупреждение о деградации на основе прогноза
+    \item Diagnostic Engine проверяет загрузку зависимых сервисов (\texttt{inventory}, \texttt{payment})
+    \item Определяется, что узким местом является \texttt{payment-service} с высокой загрузкой CPU
+\end{itemize}
+
+\textbf{Действие восстановления:}
+\begin{itemize}
+    \item Превентивное масштабирование \texttt{payment-service} (увеличение числа реплик до расчётного значения)
+    \item Перераспределение трафика с более равномерной балансировкой запросов
+    \item Контроль фактического значения latency и откат изменений при отсутствии эффекта
+\end{itemize}
+
+\subsection{Сценарий 4: Неудачный релиз и откат конфигурации}
+
+\textbf{Симптомы:}
+\begin{itemize}
+    \item После выката новой версии \texttt{payment-service} фиксируется рост доли ошибок 5xx
+    \item Увеличение MTTR для инцидентов, связанных с платёжными операциями
+\end{itemize}
+
+\textbf{Пример логов:}
+\begin{lstlisting}[caption={Фрагмент логов после неудачного релиза}, label=lst:log_failed_release]
+{
+  "timestamp": "2024-01-15T11:05:00Z",
+  "level": "ERROR",
+  "service": "payment-service",
+  "message": "NullPointerException in PaymentProcessor",
+  "version": "2.3.0",
+  "trace_id": "xyz789"
+}
+\end{lstlisting}
+
+\textbf{Диагностика:}
+\begin{itemize}
+    \item Diagnostic Engine связывает рост ошибок с конкретной версией сервиса (\texttt{version=2.3.0})
+    \item Анализ метрик показывает ухудшение показателей только после момента релиза
+    \item Safe Executor оценивает риск продолжения работы текущей версии как превышающий допустимый порог
+\end{itemize}
+
+\textbf{Действие восстановления:}
+\begin{itemize}
+    \item Откат \texttt{payment-service} к предыдущей стабильной версии (\texttt{2.2.5}) через Kubernetes Deployment rollback
+    \item Верификация снижения \(\text{ErrorRate}\) и восстановления MTTR до базового уровня
+    \item Запись результата сценария в журнал инцидентов для последующего анализа и доработки процесса релизов
+\end{itemize}
+

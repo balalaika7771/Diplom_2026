@@ -1,42 +1,90 @@
 \chapter{Схемы архитектуры системы}
 
-\section{Детальная архитектура модулей}
+\section{Полная архитектура прототипа}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=2cm, scale=0.9]
-    \node[rectangle, draw, fill=blue!20, minimum width=3cm, minimum height=1.5cm] (collector) {Data Collector};
-    \node[rectangle, draw, fill=green!20, minimum width=3cm, minimum height=1.5cm, right=of collector] (analyzer) {Anomaly Analyzer};
-    \node[rectangle, draw, fill=yellow!20, minimum width=3cm, minimum height=1.5cm, below=of analyzer] (diagnostic) {Diagnostic Engine};
-    \node[rectangle, draw, fill=red!20, minimum width=3cm, minimum height=1.5cm, left=of diagnostic] (orchestrator) {Orchestrator};
-    \node[rectangle, draw, fill=orange!20, minimum width=3cm, minimum height=1.5cm, below=of orchestrator] (executor) {Safe Executor};
-    
-    \draw[->, thick] (collector) -- node[above] {Metrics} (analyzer);
-    \draw[->, thick] (analyzer) -- node[right] {Anomalies} (diagnostic);
-    \draw[->, thick] (diagnostic) -- node[above] {Root Cause} (orchestrator);
-    \draw[->, thick] (orchestrator) -- node[right] {Actions} (executor);
-    \draw[->, thick, dashed] (executor) -- node[left] {Feedback} (collector);
+\begin{tikzpicture}[node distance=1.5cm, auto, scale=0.8, transform shape, font=\small]
+    % Observability stack
+    \node[rectangle, draw, fill=blue!20, minimum width=1.8cm, minimum height=0.8cm] (prometheus) {Prometheus};
+    \node[rectangle, draw, fill=blue!20, below=of prometheus, minimum width=1.8cm, minimum height=0.8cm] (es) {Elasticsearch};
+    \node[rectangle, draw, fill=blue!20, below=of es, minimum width=1.8cm, minimum height=0.8cm] (jaeger) {Jaeger};
+
+    % Messaging and cache
+    \node[rectangle, draw, fill=gray!20, right=4cm of prometheus, minimum width=1.6cm, minimum height=0.8cm] (kafka) {Kafka};
+    \node[rectangle, draw, fill=gray!20, right=3cm of es, minimum width=1.6cm, minimum height=0.8cm] (redis) {Redis};
+
+    % Agents
+    \node[rectangle, draw, fill=green!20, above right=2cm and 3cm of kafka, minimum width=2.2cm, minimum height=0.8cm] (collector) {Collector};
+    \node[rectangle, draw, fill=green!20, right=of collector, minimum width=2.2cm, minimum height=0.8cm] (detector) {Detector};
+    \node[rectangle, draw, fill=green!20, below=of detector, minimum width=2.2cm, minimum height=0.8cm] (diagnostic) {Diagnostic};
+    \node[rectangle, draw, fill=green!20, below=of collector, minimum width=2.2cm, minimum height=0.8cm] (orchestrator) {Orchestrator};
+    \node[rectangle, draw, fill=green!20, below=of orchestrator, minimum width=2.2cm, minimum height=0.8cm] (executor) {Safe Executor};
+
+    % LLM / MCP
+    \node[rectangle, draw, fill=purple!20, above=of diagnostic, minimum width=2.2cm, minimum height=0.8cm] (llmagent) {LLM Agent};
+    \node[rectangle, draw, fill=purple!10, above=of llmagent, minimum width=2.2cm, minimum height=0.8cm] (mcp) {MCP Server};
+    \node[rectangle, draw, fill=red!10, above=of mcp, minimum width=2.2cm, minimum height=0.8cm] (llmprovider) {LLM Provider};
+
+    % Business services (Kubernetes)
+    \node[rectangle, draw, fill=orange!20, right=5cm of detector, minimum width=2.4cm, minimum height=0.8cm] (svc1) {order-service};
+    \node[rectangle, draw, fill=orange!20, below=of svc1, minimum width=2.4cm, minimum height=0.8cm] (svc2) {payment-service};
+    \node[rectangle, draw, fill=orange!20, below=of svc2, minimum width=2.4cm, minimum height=0.8cm] (svc3) {inventory-service};
+
+    % Observability arrows
+    \draw[->, thick] (prometheus.east) -- node[above] {} (collector.west);
+    \draw[->, thick] (es.east) -- (collector.west);
+    \draw[->, thick] (jaeger.east) -- (collector.west);
+
+    % Collector to Kafka/Redis
+    \draw[->, thick] (collector.south west) -- (kafka.north);
+    \draw[->, thick] (collector.south) -- (redis.north);
+
+    % Kafka to agents
+    \draw[->, thick] (kafka.east) -- (detector.west);
+    \draw[->, thick] (kafka.east) |- (diagnostic.west);
+    \draw[->, thick] (kafka.east) |- (orchestrator.west);
+    \draw[->, thick] (kafka.east) |- (executor.west);
+
+    % Agents chain
+    \draw[->, thick] (detector.south) -- node[right] {Anomalies} (diagnostic.north);
+    \draw[->, thick] (diagnostic.west) -- node[above] {Root Cause} (orchestrator.east);
+    \draw[->, thick] (orchestrator.south) -- node[right] {Actions} (executor.north);
+    \draw[->, thick, dashed, bend left=25] (executor.west) to node[left] {Feedback} (collector.south);
+
+    % LLM / MCP
+    \draw[->, thick] (diagnostic.north) -- (llmagent.south);
+    \draw[->, thick] (collector.north) |- (llmagent.west);
+    \draw[->, thick] (llmagent.north) -- (mcp.south);
+    \draw[->, thick] (mcp.north) -- (llmprovider.south);
+    \draw[->, thick] (llmagent.south east) |- (orchestrator.north);
+
+    % Executor to services (Kubernetes)
+    \draw[->, thick] (executor.east) -- (svc2.west);
+    \draw[->, thick, dashed] (svc1.west) -- (prometheus.east);
+    \draw[->, thick, dashed] (svc2.west) -- (prometheus.east);
+    \draw[->, thick, dashed] (svc3.west) -- (prometheus.east);
 \end{tikzpicture}
-\caption{Детальная схема взаимодействия модулей системы}
-\label{fig:appendix_detailed_architecture}
+\caption{Полная архитектура прототипа системы интеллектуальных агентов}
+\label{fig:appendix_full_architecture}
 \end{figure}
 
 \section{Схема потока данных}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=1.5cm]
-    \node[rectangle, draw, fill=blue!20] (prometheus) {Prometheus};
-    \node[rectangle, draw, fill=blue!20, below=of prometheus] (elk) {ELK Stack};
-    \node[rectangle, draw, fill=blue!20, below=of elk] (jaeger) {Jaeger};
+\begin{tikzpicture}[node distance=2cm]
+    \node[rectangle, draw, fill=blue!20, minimum width=2.5cm] (prometheus) {Prometheus};
+    \node[rectangle, draw, fill=blue!20, below=of prometheus, minimum width=2.5cm] (elk) {ELK Stack};
+    \node[rectangle, draw, fill=blue!20, below=of elk, minimum width=2.5cm] (jaeger) {Jaeger};
     
-    \node[rectangle, draw, fill=green!20, right=3cm of prometheus] (collector) {Data Collector};
-    \node[rectangle, draw, fill=yellow!20, right=of collector] (storage) {Time Series DB};
+    \node[rectangle, draw, fill=green!20, right=4cm of prometheus, minimum width=2.8cm] (collector) {Data Collector};
+    \node[rectangle, draw, fill=yellow!20, right=3cm of collector, minimum width=2.8cm] (storage) {Time Series DB};
     
-    \draw[->] (prometheus) -- (collector);
-    \draw[->] (elk) -- (collector);
-    \draw[->] (jaeger) -- (collector);
-    \draw[->] (collector) -- (storage);
+    \draw[->,thick] (prometheus) -- (collector);
+    \draw[->,thick] (elk) -- (collector);
+    \draw[->,thick] (jaeger) -- (collector);
+    \draw[->,thick] (collector) -- (storage);
 \end{tikzpicture}
 \caption{Схема потока данных от источников к хранилищу}
 \label{fig:appendix_data_flow}

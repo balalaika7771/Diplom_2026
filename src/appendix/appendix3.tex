@@ -253,3 +253,149 @@ public class DiagnosticEngineService {
     }
 }
 \end{lstlisting}
+
+\section{Реализация модуля оркестрации и исполнения}
+
+\begin{lstlisting}[language=Java, caption={Модуль оркестрации и безопасного исполнения действий}, label=lst:orchestrator_executor, escapeinside={(*@}{@*)}]
+package com.autonomous.agents.agents;
+
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class OrchestratorService {
+
+    private final SafeExecutorService safeExecutorService;
+
+    public OrchestratorService(SafeExecutorService safeExecutorService) {
+        this.safeExecutorService = safeExecutorService;
+    }
+
+    (*@// Формирование и выполнение плана восстановления@*)
+    public void handleDiagnosis(DiagnosisReport report) {
+        List<RecoveryAction> actions = buildRecoveryPlan(report);
+        for (RecoveryAction action : actions) {
+            safeExecutorService.execute(action);
+        }
+    }
+
+    private List<RecoveryAction> buildRecoveryPlan(DiagnosisReport report) {
+        (*@// Упрощённая логика построения плана@*)
+        return List.of(
+            new RecoveryAction("scale_up", report.getService(), 2),
+            new RecoveryAction("restart", report.getService(), 0)
+        );
+    }
+
+    public static class DiagnosisReport {
+        private final String service;
+
+        public DiagnosisReport(String service) {
+            this.service = service;
+        }
+
+        public String getService() {
+            return service;
+        }
+    }
+
+    public static class RecoveryAction {
+        private final String type;
+        private final String targetService;
+        private final int factor;
+
+        public RecoveryAction(String type, String targetService, int factor) {
+            this.type = type;
+            this.targetService = targetService;
+            this.factor = factor;
+        }
+
+        public String getType() { return type; }
+        public String getTargetService() { return targetService; }
+        public int getFactor() { return factor; }
+    }
+}
+
+@Service
+class SafeExecutorService {
+
+    (*@// Проверка риска и безопасное выполнение действий@*)
+    public void execute(OrchestratorService.RecoveryAction action) {
+        if (isSafe(action)) {
+            apply(action);
+        } else {
+            (*@// Логируем отказ по критериям безопасности@*)
+        }
+    }
+
+    private boolean isSafe(OrchestratorService.RecoveryAction action) {
+        (*@// Упрощённая проверка риска@*)
+        return !"restart".equals(action.getType()) || action.getFactor() == 0;
+    }
+
+    private void apply(OrchestratorService.RecoveryAction action) {
+        (*@// Взаимодействие с Kubernetes API для масштабирования или перезапуска@*)
+    }
+}
+\end{lstlisting}
+
+\section{Реализация MCP-сервера}
+
+\begin{lstlisting}[language=Java, caption={Упрощённый MCP-сервер для обработки JSON-RPC запросов}, label=lst:mcp_server, escapeinside={(*@}{@*)}]
+package com.autonomous.agents.mcp;
+
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Service
+public class McpServer {
+
+    private final SystemContextTool systemContextTool;
+    private final LogAnalysisTool logAnalysisTool;
+
+    public McpServer(SystemContextTool systemContextTool,
+                     LogAnalysisTool logAnalysisTool) {
+        this.systemContextTool = systemContextTool;
+        this.logAnalysisTool = logAnalysisTool;
+    }
+
+    (*@// Обработка JSON-RPC запроса от LLM-агента@*)
+    public Map<String, Object> process(Map<String, Object> request) {
+        String method = (String) request.get("method");
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+
+        switch (method) {
+            case "system_context":
+                return systemContextTool.invoke(params);
+            case "log_analysis":
+                return logAnalysisTool.invoke(params);
+            default:
+                throw new IllegalArgumentException("Unknown method: " + method);
+        }
+    }
+
+    public interface McpTool {
+        Map<String, Object> invoke(Map<String, Object> params);
+    }
+
+    @Service
+    public static class SystemContextTool implements McpTool {
+        @Override
+        public Map<String, Object> invoke(Map<String, Object> params) {
+            (*@// Возврат агрегированного контекста системы@*)
+            return Map.of("metrics", Map.of(), "services", Map.of());
+        }
+    }
+
+    @Service
+    public static class LogAnalysisTool implements McpTool {
+        @Override
+        public Map<String, Object> invoke(Map<String, Object> params) {
+            (*@// Возврат результатов анализа логов@*)
+            return Map.of("errors", Map.of(), "patterns", Map.of());
+        }
+    }
+}
+\end{lstlisting}
