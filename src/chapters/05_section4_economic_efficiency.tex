@@ -1,0 +1,10 @@
+\chapter{Экономическая эффективность разработки}
+
+% Переопределяем \chapter на \section для включённой главы
+\let\oldchapter\chapter
+\renewcommand{\chapter}[1]{\section{#1}}
+
+\input{src/chapters/12_practical_value}
+
+% Восстанавливаем оригинальную команду \chapter
+\let\chapter\oldchapter

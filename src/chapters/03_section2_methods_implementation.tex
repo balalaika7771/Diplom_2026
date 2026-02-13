@@ -1,0 +1,12 @@
+\chapter{Методы создания системы, реализация}
+
+% Переопределяем \chapter на \section для включённых глав
+\let\oldchapter\chapter
+\renewcommand{\chapter}[1]{\section{#1}}
+
+\input{src/chapters/08_system_architecture}
+\input{src/chapters/09_comparing_paradigms}
+\input{src/chapters/10_prototype}
+
+% Восстанавливаем оригинальную команду \chapter
+\let\chapter\oldchapter

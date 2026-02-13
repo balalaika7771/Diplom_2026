@@ -1,0 +1,17 @@
+% Сбрасываем счетчик глав, чтобы разделы начинались с 1
+\setcounter{chapter}{0}
+\chapter{Обзор литературных источников по теме диплома, аналогов, прототипов}
+
+% Переопределяем \chapter на \section для включённых глав
+\let\oldchapter\chapter
+\renewcommand{\chapter}[1]{\section{#1}}
+
+\input{src/chapters/02_theory_distributed_systems}
+\input{src/chapters/03_observability}
+\input{src/chapters/04_backend_approaches}
+\input{src/chapters/05_devops_sre}
+\input{src/chapters/06_anomaly_detection}
+\input{src/chapters/07_autonomous_agents}
+
+% Восстанавливаем оригинальную команду \chapter
+\let\chapter\oldchapter

@@ -1,0 +1,10 @@
+\chapter{Результаты работы}
+
+% Переопределяем \chapter на \section для включённой главы
+\let\oldchapter\chapter
+\renewcommand{\chapter}[1]{\section{#1}}
+
+\input{src/chapters/11_experiments}
+
+% Восстанавливаем оригинальную команду \chapter
+\let\chapter\oldchapter
