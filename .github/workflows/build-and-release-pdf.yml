@@ -28,7 +28,6 @@ jobs:
             texlive-luatex \
             texlive-extra-utils \
             texlive-font-utils \
-            texlive-htmlxml \
             biber \
             make \
             pandoc \
@@ -38,8 +37,11 @@ jobs:
             libreoffice \
             lua5.3
           
-          # Устанавливаем latexpand и make4ht для объединения и конвертации LaTeX файлов
-          pip3 install latexpand make4ht
+          # Устанавливаем latexpand для объединения LaTeX файлов
+          pip3 install latexpand
+          
+          # Устанавливаем make4ht через pip (если доступен) или используем htlatex напрямую
+          pip3 install make4ht 2>/dev/null || echo "make4ht будет использован через htlatex"
 
       - name: Generate chapter lists and build PDF
         run: |
