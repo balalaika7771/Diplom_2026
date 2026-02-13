@@ -173,17 +173,32 @@ jobs:
             local ENCODED_PATH=$(url_encode "$FOLDER_PATH")
             
             echo "Проверка/создание папки: $FOLDER_PATH"
+            
+            # Сначала проверяем, существует ли папка
+            CHECK_RESPONSE=$(curl -s -X GET \
+              "https://cloud-api.yandex.net/v1/disk/resources?path=$ENCODED_PATH" \
+              -H "Authorization: OAuth $TOKEN")
+            
+            if echo "$CHECK_RESPONSE" | grep -q '"type":"dir"'; then
+              echo "Папка уже существует"
+              return 0
+            fi
+            
+            # Пытаемся создать папку
             RESPONSE=$(curl -s -X PUT \
               "https://cloud-api.yandex.net/v1/disk/resources?path=$ENCODED_PATH" \
               -H "Authorization: OAuth $TOKEN")
             
             # Проверяем результат
-            if echo "$RESPONSE" | grep -q "already_exists\|DiskPathPointsToExistentDirectoryError\|created"; then
-              echo "Папка готова к использованию"
+            if echo "$RESPONSE" | grep -q '"type":"dir"\|"created"\|"path"'; then
+              echo "Папка создана успешно"
+              return 0
+            elif echo "$RESPONSE" | grep -q "already_exists\|DiskPathPointsToExistentDirectoryError"; then
+              echo "Папка уже существует"
               return 0
             else
-              echo "Ответ API при создании папки: $RESPONSE"
-              # Продолжаем в любом случае, возможно папка уже существует
+              echo "Предупреждение: не удалось создать папку, ответ API: $RESPONSE"
+              # Продолжаем в любом случае
               return 0
             fi
           }
@@ -225,36 +240,30 @@ jobs:
             fi
           }
           
-          # Пробуем найти правильный путь к расшаренной папке
-          # Сначала пробуем стандартные варианты
-          POSSIBLE_PATHS=("disk:/Диссертация" "disk:/Диссертация/" "disk:/")
+          # Используем путь к папке "Диссертация"
+          BASE_PATH="disk:/Диссертация"
           
-          BASE_PATH=""
-          for TEST_PATH in "${POSSIBLE_PATHS[@]}"; do
-            echo "Проверка пути: $TEST_PATH"
-            ENCODED_TEST=$(url_encode "$TEST_PATH")
-            RESPONSE=$(curl -s -X GET \
-              "https://cloud-api.yandex.net/v1/disk/resources?path=$ENCODED_TEST" \
-              -H "Authorization: OAuth $TOKEN")
-            
-            if echo "$RESPONSE" | grep -q '"type":"dir"\|"path":'; then
-              BASE_PATH="$TEST_PATH"
-              echo "Найден рабочий путь: $BASE_PATH"
-              break
-            fi
-          done
+          # Проверяем существование папки и создаем если нужно
+          echo "Проверка/создание папки: $BASE_PATH"
+          ENCODED_BASE=$(url_encode "$BASE_PATH")
+          RESPONSE=$(curl -s -X GET \
+            "https://cloud-api.yandex.net/v1/disk/resources?path=$ENCODED_BASE" \
+            -H "Authorization: OAuth $TOKEN")
           
-          # Если не нашли, используем путь по умолчанию и создаем папку
-          if [ -z "$BASE_PATH" ]; then
-            BASE_PATH="disk:/Диссертация"
-            echo "Используем путь по умолчанию: $BASE_PATH"
+          if ! echo "$RESPONSE" | grep -q '"type":"dir"'; then
+            echo "Папка не существует, создаем..."
             ensure_folder "$BASE_PATH"
+          else
+            echo "Папка существует"
           fi
           
           # Создаем подпапку с датой и временем для каждой сборки
           TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-          BUILD_FOLDER="${BASE_PATH}/build_${TIMESTAMP}"
+          # Убираем завершающий слеш из BASE_PATH если есть
+          BASE_PATH_CLEAN="${BASE_PATH%/}"
+          BUILD_FOLDER="${BASE_PATH_CLEAN}/build_${TIMESTAMP}"
           
+          echo "Создание подпапки для сборки: $BUILD_FOLDER"
           # Создаем подпапку для сборки
           ensure_folder "$BUILD_FOLDER"
           
