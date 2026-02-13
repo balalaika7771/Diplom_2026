@@ -51,133 +51,179 @@ jobs:
         run: |
           cd build
           
-          # Метод 1: Используем latexpand для объединения всех включений в один файл
-          echo "Объединение LaTeX файлов..."
-          if command -v latexpand &> /dev/null; then
-            echo "Используем latexpand для объединения файлов..."
-            # Пробуем с библиографией
-            if [ -f main.bbl ]; then
-              latexpand --expand-bbl main.bbl main.tex > main_expanded.tex 2>&1
-              if [ $? -ne 0 ] || [ ! -s main_expanded.tex ]; then
-                echo "latexpand с библиографией не сработал, пробуем без..."
-                latexpand main.tex > main_expanded.tex 2>&1
-              fi
-            else
-              latexpand main.tex > main_expanded.tex 2>&1
+          # Функция для проверки валидности DOCX файла
+          check_docx_valid() {
+            local docx_file="$1"
+            if [ ! -f "$docx_file" ] || [ ! -s "$docx_file" ]; then
+              return 1
             fi
             
-            # Проверяем результат
-            if [ ! -s main_expanded.tex ]; then
-              echo "latexpand не создал файл, используем исходный main.tex"
-              cp main.tex main_expanded.tex
+            # Проверяем размер (должен быть больше 10KB)
+            local FILE_SIZE=$(stat -f%z "$docx_file" 2>/dev/null || stat -c%s "$docx_file" 2>/dev/null || echo "0")
+            if [ "$FILE_SIZE" -lt 10000 ]; then
+              return 1
+            fi
+            
+            # Проверяем, что это валидный ZIP архив (DOCX это ZIP)
+            if ! unzip -t -q "$docx_file" 2>/dev/null; then
+              return 1
+            fi
+            
+            # Проверяем наличие обязательных файлов в DOCX
+            if ! unzip -l "$docx_file" 2>/dev/null | grep -q "word/document.xml"; then
+              return 1
+            fi
+            
+            return 0
+          }
+          
+          CONVERSION_SUCCESS=false
+          
+          # Метод 1: PDF -> DOCX через LibreOffice (самый надежный, так как PDF уже собран)
+          echo "=== Метод 1: Конвертация PDF -> DOCX через LibreOffice ==="
+          if [ -f main.pdf ]; then
+            PDF_SIZE=$(stat -f%z main.pdf 2>/dev/null || stat -c%s main.pdf 2>/dev/null || echo "0")
+            echo "PDF размер: $PDF_SIZE байт"
+            
+            if [ "$PDF_SIZE" -gt 10000 ]; then
+              echo "Конвертация PDF в DOCX через LibreOffice..."
+              # Используем более надежные опции для LibreOffice
+              libreoffice --headless \
+                --nodefault \
+                --nolockcheck \
+                --nologo \
+                --norestore \
+                --convert-to docx:"MS Word 2007 XML" \
+                --outdir . \
+                main.pdf 2>&1 | tee libreoffice.log
+              
+              if check_docx_valid main.docx; then
+                FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
+                echo "✓ PDF успешно конвертирован в DOCX (размер: $FILE_SIZE байт)"
+                CONVERSION_SUCCESS=true
+              else
+                echo "⚠ DOCX файл невалиден или поврежден, пробуем другой метод..."
+                rm -f main.docx
+              fi
             else
-              echo "✓ Файлы объединены через latexpand ($(wc -l < main_expanded.tex) строк)"
+              echo "⚠ PDF файл слишком маленький, пропускаем конвертацию"
             fi
           else
-            echo "latexpand не найден, используем исходный main.tex"
-            cp main.tex main_expanded.tex
+            echo "⚠ PDF файл не найден"
           fi
           
-          # Метод 2: Конвертируем через pandoc с расширенным файлом
-          echo "Конвертация в DOCX через pandoc..."
-          PANDOC_SUCCESS=false
-          
-          # Попытка 1: с максимальными опциями
-          pandoc main_expanded.tex \
-            --from=latex+raw_tex+tex_math_dollars \
-            --to=docx \
-            --output=main.docx \
-            --standalone \
-            --wrap=none \
-            --extract-media=media \
-            --toc \
-            --toc-depth=3 \
-            2>&1 | tee pandoc.log
-          
-          if [ -f main.docx ] && [ -s main.docx ]; then
-            FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-            if [ "$FILE_SIZE" -gt 10000 ]; then
-              echo "✓ Pandoc успешно создал DOCX (размер: $FILE_SIZE байт)"
-              PANDOC_SUCCESS=true
+          # Метод 2: LaTeX -> DOCX через pandoc (если PDF метод не сработал)
+          if [ "$CONVERSION_SUCCESS" = false ]; then
+            echo ""
+            echo "=== Метод 2: Конвертация LaTeX -> DOCX через pandoc ==="
+            
+            # Объединяем LaTeX файлы
+            if command -v latexpand &> /dev/null; then
+              echo "Объединение LaTeX файлов через latexpand..."
+              if [ -f main.bbl ]; then
+                latexpand --expand-bbl main.bbl main.tex > main_expanded.tex 2>&1 || \
+                latexpand main.tex > main_expanded.tex 2>&1
+              else
+                latexpand main.tex > main_expanded.tex 2>&1
+              fi
+              
+              if [ -s main_expanded.tex ]; then
+                echo "✓ Файлы объединены ($(wc -l < main_expanded.tex) строк)"
+                TEX_FILE="main_expanded.tex"
+              else
+                echo "⚠ latexpand не сработал, используем исходный main.tex"
+                TEX_FILE="main.tex"
+              fi
             else
-              echo "⚠ DOCX файл слишком маленький ($FILE_SIZE байт), пробуем другой метод..."
-              rm -f main.docx
+              echo "latexpand не найден, используем исходный main.tex"
+              TEX_FILE="main.tex"
             fi
-          fi
-          
-          # Попытка 2: упрощенный вариант
-          if [ "$PANDOC_SUCCESS" = false ]; then
-            echo "Попытка упрощенной конвертации через pandoc..."
-            pandoc main_expanded.tex \
+            
+            # Конвертируем через pandoc
+            echo "Конвертация через pandoc..."
+            pandoc "$TEX_FILE" \
               --from=latex \
               --to=docx \
               --output=main.docx \
               --standalone \
-              2>&1 | tee -a pandoc.log
+              --wrap=none \
+              2>&1 | tee pandoc.log
             
-            if [ -f main.docx ] && [ -s main.docx ]; then
+            if check_docx_valid main.docx; then
               FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-              if [ "$FILE_SIZE" -gt 10000 ]; then
-                echo "✓ Pandoc создал DOCX упрощенным методом (размер: $FILE_SIZE байт)"
-                PANDOC_SUCCESS=true
-              fi
+              echo "✓ Pandoc успешно создал DOCX (размер: $FILE_SIZE байт)"
+              CONVERSION_SUCCESS=true
+            else
+              echo "⚠ Pandoc создал невалидный DOCX, пробуем другой метод..."
+              rm -f main.docx
             fi
           fi
           
-          # Метод 3: Если pandoc не сработал, пробуем через PDF -> DOCX через LibreOffice
-          if [ "$PANDOC_SUCCESS" = false ]; then
-            echo "Pandoc не сработал, пробуем конвертацию PDF -> DOCX через LibreOffice..."
-            if [ -f main.pdf ]; then
-              echo "Конвертация PDF в DOCX..."
-              libreoffice --headless --convert-to docx --outdir . main.pdf 2>&1
-              
-              if [ -f main.docx ]; then
-                FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-                if [ "$FILE_SIZE" -gt 10000 ]; then
-                  echo "✓ PDF успешно конвертирован в DOCX (размер: $FILE_SIZE байт)"
-                  PANDOC_SUCCESS=true
-                fi
-              fi
-            fi
-          fi
-          
-          # Метод 4: Через htlatex -> ODT -> DOCX
-          if [ "$PANDOC_SUCCESS" = false ]; then
-            echo "Попытка конвертации через htlatex -> ODT -> DOCX..."
-            htlatex main_expanded.tex "odt" "" "" "-interaction=nonstopmode" 2>&1 | tail -20
+          # Метод 3: LaTeX -> ODT -> DOCX через LibreOffice
+          if [ "$CONVERSION_SUCCESS" = false ]; then
+            echo ""
+            echo "=== Метод 3: Конвертация LaTeX -> ODT -> DOCX ==="
             
-            if [ -f main_expanded.odt ]; then
+            if [ -z "$TEX_FILE" ]; then
+              if [ -f main_expanded.tex ]; then
+                TEX_FILE="main_expanded.tex"
+              else
+                TEX_FILE="main.tex"
+              fi
+            fi
+            
+            echo "Конвертация LaTeX в ODT через htlatex..."
+            htlatex "$TEX_FILE" "odt" "" "" "-interaction=nonstopmode" 2>&1 | tail -30
+            
+            if [ -f "${TEX_FILE%.tex}.odt" ]; then
+              ODT_FILE="${TEX_FILE%.tex}.odt"
+            elif [ -f main_expanded.odt ]; then
+              ODT_FILE="main_expanded.odt"
+            else
+              ODT_FILE=""
+            fi
+            
+            if [ -n "$ODT_FILE" ] && [ -f "$ODT_FILE" ]; then
               echo "Конвертация ODT в DOCX через LibreOffice..."
-              libreoffice --headless --convert-to docx --outdir . main_expanded.odt 2>&1
+              libreoffice --headless \
+                --nodefault \
+                --nolockcheck \
+                --nologo \
+                --norestore \
+                --convert-to docx:"MS Word 2007 XML" \
+                --outdir . \
+                "$ODT_FILE" 2>&1 | tee -a libreoffice.log
               
-              if [ -f main_expanded.docx ]; then
-                mv main_expanded.docx main.docx
+              if [ -f "${ODT_FILE%.odt}.docx" ]; then
+                mv "${ODT_FILE%.odt}.docx" main.docx
+              fi
+              
+              if check_docx_valid main.docx; then
                 FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-                if [ "$FILE_SIZE" -gt 10000 ]; then
-                  echo "✓ ODT успешно конвертирован в DOCX (размер: $FILE_SIZE байт)"
-                  PANDOC_SUCCESS=true
-                fi
+                echo "✓ ODT успешно конвертирован в DOCX (размер: $FILE_SIZE байт)"
+                CONVERSION_SUCCESS=true
               fi
             fi
           fi
           
-          # Проверяем финальный результат
-          if [ ! -f main.docx ] || [ ! -s main.docx ]; then
-            echo "❌ Ошибка: Word документ не создан или пустой"
+          # Финальная проверка
+          echo ""
+          if [ "$CONVERSION_SUCCESS" = false ] || ! check_docx_valid main.docx; then
+            echo "❌ Ошибка: Не удалось создать валидный Word документ"
             echo "Размер файла: $(ls -lh main.docx 2>/dev/null || echo 'файл не существует')"
-            echo "Последние строки лога pandoc:"
-            tail -30 pandoc.log 2>/dev/null || echo "Лог не найден"
+            if [ -f pandoc.log ]; then
+              echo "Последние строки лога pandoc:"
+              tail -30 pandoc.log
+            fi
+            if [ -f libreoffice.log ]; then
+              echo "Последние строки лога LibreOffice:"
+              tail -30 libreoffice.log
+            fi
             exit 1
           fi
           
           FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-          if [ "$FILE_SIZE" -lt 10000 ]; then
-            echo "⚠ Предупреждение: DOCX файл очень маленький ($FILE_SIZE байт), возможно пустой"
-            echo "Последние строки лога pandoc:"
-            tail -30 pandoc.log 2>/dev/null || echo "Лог не найден"
-          else
-            echo "✓ Word документ создан успешно (размер: $FILE_SIZE байт)"
-          fi
+          echo "✓ Word документ создан успешно и валиден (размер: $FILE_SIZE байт)"
           ls -lh main.docx
 
       - name: Upload PDF artifact
