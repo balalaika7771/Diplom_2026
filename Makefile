@@ -38,16 +38,28 @@ copy-sources:
 generate-lists: copy-sources
 	@echo "Генерация списков глав и приложений..."
 	@mkdir -p $(BUILD_DIR)/src/chapters $(BUILD_DIR)/src/appendix
-	@echo "% Файл сгенерирован автоматически. Не редактируйте вручную." > $(BUILD_DIR)/src/chapters/chapters_list.tex
-	@for f in $(CHAPTER_TEX); do \
-		base=$$(basename $$f .tex); \
-		echo "\\inputchapter{$$base}" >> $(BUILD_DIR)/src/chapters/chapters_list.tex; \
-	done
-	@echo "% Файл сгенерирован автоматически. Не редактируйте вручную." > $(BUILD_DIR)/src/appendix/appendix_list.tex
-	@for f in $(APPENDIX_TEX); do \
-		base=$$(basename $$f .tex); \
-		echo "\\inputappendix{$$base}" >> $(BUILD_DIR)/src/appendix/appendix_list.tex; \
-	done
+	@if [ -f src/chapters/chapters_list.tex ]; then \
+		echo "Используется существующий файл chapters_list.tex"; \
+		cp src/chapters/chapters_list.tex $(BUILD_DIR)/src/chapters/chapters_list.tex; \
+	else \
+		echo "Генерация chapters_list.tex автоматически..."; \
+		echo "% Файл сгенерирован автоматически. Не редактируйте вручную." > $(BUILD_DIR)/src/chapters/chapters_list.tex; \
+		for f in $(CHAPTER_TEX); do \
+			base=$$(basename $$f .tex); \
+			echo "\\inputchapter{$$base}" >> $(BUILD_DIR)/src/chapters/chapters_list.tex; \
+		done; \
+	fi
+	@if [ -f src/appendix/appendix_list.tex ]; then \
+		echo "Используется существующий файл appendix_list.tex"; \
+		cp src/appendix/appendix_list.tex $(BUILD_DIR)/src/appendix/appendix_list.tex; \
+	else \
+		echo "Генерация appendix_list.tex автоматически..."; \
+		echo "% Файл сгенерирован автоматически. Не редактируйте вручную." > $(BUILD_DIR)/src/appendix/appendix_list.tex; \
+		for f in $(APPENDIX_TEX); do \
+			base=$$(basename $$f .tex); \
+			echo "\\inputappendix{$$base}" >> $(BUILD_DIR)/src/appendix/appendix_list.tex; \
+		done; \
+	fi
 
 # Первая компиляция LaTeX
 $(BUILD_DIR)/$(MAIN).aux: $(MAIN).tex | generate-lists

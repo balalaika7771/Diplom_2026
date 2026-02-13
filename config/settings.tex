@@ -22,9 +22,10 @@
 
 % Настройки заголовков по ГОСТу 7.32-2017 и требованиям РУДН
 % Заголовки структурных элементов - по центру, прописными буквами, без точки в конце
+% Для разделов используем только номер без слова "РАЗДЕЛ" или "ГЛАВА"
 \titleformat{\chapter}[display]
 {\normalfont\bfseries\centering}
-{\MakeUppercase{\chaptertitlename\ \thechapter}}{20pt}{\Large}
+{\thechapter}{20pt}{\Large\MakeUppercase}
 
 \titleformat{\section}
 {\normalfont\bfseries\centering}
