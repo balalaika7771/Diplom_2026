@@ -26,10 +26,20 @@ jobs:
             texlive-science \
             texlive-pictures \
             texlive-luatex \
+            texlive-extra-utils \
+            texlive-font-utils \
+            texlive-htmlxml \
             biber \
             make \
             pandoc \
-            python3
+            python3 \
+            python3-pip \
+            unzip \
+            libreoffice \
+            lua5.3
+          
+          # Устанавливаем latexpand и make4ht для объединения и конвертации LaTeX файлов
+          pip3 install latexpand make4ht
 
       - name: Generate chapter lists and build PDF
         run: |
@@ -38,27 +48,72 @@ jobs:
       - name: Convert LaTeX to Word document
         run: |
           cd build
-          # Попытка конвертации через pandoc
-          # Используем standalone режим для обработки включений
-          pandoc main.tex \
-            --from=latex+raw_tex \
+          
+          # Метод 1: Используем latexpand для объединения всех включений в один файл
+          echo "Объединение LaTeX файлов через latexpand..."
+          latexpand --expand-bbl main.bbl main.tex > main_expanded.tex 2>/dev/null || \
+          latexpand main.tex > main_expanded.tex 2>/dev/null || \
+          cp main.tex main_expanded.tex
+          
+          # Метод 2: Конвертируем через pandoc с расширенным файлом
+          echo "Конвертация в DOCX через pandoc..."
+          pandoc main_expanded.tex \
+            --from=latex \
             --to=docx \
             --output=main.docx \
             --standalone \
             --wrap=none \
-            --extract-media=media || \
-          pandoc main.tex \
+            --extract-media=media \
+            --reference-doc=/usr/share/pandoc/data/reference.docx 2>/dev/null || \
+          pandoc main_expanded.tex \
             --from=latex \
             --to=docx \
             --output=main.docx \
             --standalone || \
-          echo "Warning: pandoc conversion completed with warnings, but file may be created"
+          echo "Warning: pandoc conversion completed with warnings"
           
-          # Проверяем, что файл создан
-          if [ ! -f main.docx ]; then
-            echo "Error: Word document was not created"
+          # Метод 3: Если pandoc не сработал, пробуем через make4ht -> ODT -> DOCX
+          if [ ! -f main.docx ] || [ ! -s main.docx ]; then
+            echo "Попытка конвертации через make4ht..."
+            # Конвертируем через make4ht в ODT
+            make4ht -f odt main_expanded.tex 2>/dev/null || \
+            echo "make4ht conversion attempted"
+            
+            # Если получили ODT, конвертируем в DOCX через LibreOffice
+            if [ -f main_expanded.odt ]; then
+              echo "Конвертация ODT в DOCX через LibreOffice..."
+              libreoffice --headless --convert-to docx --outdir . main_expanded.odt 2>/dev/null || \
+              echo "LibreOffice conversion attempted"
+              
+              if [ -f main_expanded.docx ]; then
+                mv main_expanded.docx main.docx
+              fi
+            fi
+          fi
+          
+          # Метод 4: Последняя попытка - напрямую через htlatex
+          if [ ! -f main.docx ] || [ ! -s main.docx ]; then
+            echo "Последняя попытка через htlatex..."
+            htlatex main_expanded.tex "odt" "" "" "-interaction=nonstopmode" 2>/dev/null || \
+            echo "htlatex conversion attempted"
+            
+            if [ -f main_expanded.odt ]; then
+              libreoffice --headless --convert-to docx --outdir . main_expanded.odt 2>/dev/null
+              if [ -f main_expanded.docx ]; then
+                mv main_expanded.docx main.docx
+              fi
+            fi
+          fi
+          
+          # Проверяем, что файл создан и не пустой
+          if [ ! -f main.docx ] || [ ! -s main.docx ]; then
+            echo "Error: Word document was not created or is empty"
+            echo "Размер файла: $(ls -lh main.docx 2>/dev/null || echo 'файл не существует')"
             exit 1
           fi
+          
+          echo "✓ Word документ создан успешно"
+          ls -lh main.docx
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
