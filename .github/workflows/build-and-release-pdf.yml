@@ -84,4 +84,73 @@ jobs:
             build/main.pdf
             build/main.docx
 
+      - name: Upload to Yandex Disk
+        if: github.ref == 'refs/heads/main'
+        env:
+          YANDEX_DISK_TOKEN: ${{ secrets.YANDEX_DISK_TOKEN }}
+        run: |
+          if [ -z "$YANDEX_DISK_TOKEN" ]; then
+            echo "Предупреждение: YANDEX_DISK_TOKEN не установлен, пропускаем загрузку на Яндекс.Диск"
+            exit 0
+          fi
+          
+          TOKEN="$YANDEX_DISK_TOKEN"
+          
+          # Функция для загрузки файла на Яндекс.Диск
+          upload_file() {
+            local FILE_PATH="$1"
+            local DISK_PATH="$2"
+            local FILENAME=$(basename "$FILE_PATH")
+            
+            echo "Загрузка $FILENAME на Яндекс.Диск в $DISK_PATH..."
+            
+            # URL-кодируем путь
+            ENCODED_PATH=$(echo "$DISK_PATH" | sed 's/ /%20/g' | sed 's/:/%3A/g' | sed 's/\//%2F/g')
+            
+            # Получаем URL для загрузки
+            RESPONSE=$(curl -s -X GET \
+              "https://cloud-api.yandex.net/v1/disk/resources/upload?path=$ENCODED_PATH&overwrite=true" \
+              -H "Authorization: OAuth $TOKEN")
+            
+            UPLOAD_URL=$(echo "$RESPONSE" | grep -o '"href":"[^"]*' | cut -d'"' -f4)
+            
+            if [ -z "$UPLOAD_URL" ]; then
+              echo "Ошибка: не удалось получить URL для загрузки"
+              echo "Ответ API: $RESPONSE"
+              return 1
+            fi
+            
+            # Загружаем файл
+            HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT "$UPLOAD_URL" \
+              --upload-file "$FILE_PATH")
+            
+            if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
+              echo "✓ Файл $FILENAME успешно загружен"
+              return 0
+            else
+              echo "Ошибка загрузки $FILENAME: HTTP $HTTP_CODE"
+              return 1
+            fi
+          }
+          
+          # Путь к папке на Яндекс.Диске
+          # Используем путь к папке, соответствующей ссылке https://disk.yandex.ru/d/RRdCy4WNyrE3xA
+          # Если нужно изменить путь, замените значение BASE_PATH
+          BASE_PATH="disk:/Диссертация"
+          
+          # Создаем подпапку с датой и временем для каждой сборки
+          TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+          BUILD_FOLDER="${BASE_PATH}/build_${TIMESTAMP}"
+          
+          # Загружаем PDF
+          upload_file "build/main.pdf" "${BUILD_FOLDER}/main.pdf"
+          
+          # Загружаем Word (если создан)
+          if [ -f "build/main.docx" ]; then
+            upload_file "build/main.docx" "${BUILD_FOLDER}/main.docx"
+          fi
+          
+          echo "Все файлы загружены в: $BUILD_FOLDER"
+          echo "Просмотр: https://disk.yandex.ru/d/RRdCy4WNyrE3xA"
+
 
