@@ -37,11 +37,11 @@ jobs:
             libreoffice \
             lua5.3
           
-          # Устанавливаем latexpand для объединения LaTeX файлов
-          pip3 install latexpand
-          
-          # Устанавливаем make4ht через pip (если доступен) или используем htlatex напрямую
-          pip3 install make4ht 2>/dev/null || echo "make4ht будет использован через htlatex"
+          # latexpand должен быть доступен через texlive-extra-utils
+          # Проверяем наличие latexpand
+          if ! command -v latexpand &> /dev/null; then
+            echo "latexpand не найден, будет использован альтернативный метод объединения файлов"
+          fi
 
       - name: Generate chapter lists and build PDF
         run: |
@@ -52,10 +52,68 @@ jobs:
           cd build
           
           # Метод 1: Используем latexpand для объединения всех включений в один файл
-          echo "Объединение LaTeX файлов через latexpand..."
-          latexpand --expand-bbl main.bbl main.tex > main_expanded.tex 2>/dev/null || \
-          latexpand main.tex > main_expanded.tex 2>/dev/null || \
-          cp main.tex main_expanded.tex
+          echo "Объединение LaTeX файлов..."
+          if command -v latexpand &> /dev/null; then
+            echo "Используем latexpand..."
+            latexpand --expand-bbl main.bbl main.tex > main_expanded.tex 2>/dev/null || \
+            latexpand main.tex > main_expanded.tex 2>/dev/null || \
+            cp main.tex main_expanded.tex
+          else
+            echo "latexpand не найден, используем простой метод объединения..."
+            # Простое объединение: заменяем \input{...} на содержимое файлов
+            python3 << 'PYTHON_SCRIPT'
+import re
+import os
+import sys
+
+def expand_inputs(content, base_dir='.'):
+    """Рекурсивно расширяет \input и \include команды"""
+    def replace_input(match):
+        filename = match.group(1)
+        # Убираем расширение .tex если есть
+        if filename.endswith('.tex'):
+            filename = filename[:-4]
+        # Пробуем разные пути
+        paths_to_try = [
+            os.path.join(base_dir, filename + '.tex'),
+            os.path.join(base_dir, 'src', 'chapters', filename + '.tex'),
+            os.path.join(base_dir, 'src', 'appendix', filename + '.tex'),
+            os.path.join(base_dir, 'config', filename + '.tex'),
+            os.path.join(base_dir, 'src', 'title', filename + '.tex'),
+            os.path.join(base_dir, 'src', 'abstract', filename + '.tex'),
+            os.path.join(base_dir, 'src', 'terms', filename + '.tex'),
+            os.path.join(base_dir, 'src', 'abbreviations', filename + '.tex'),
+            os.path.join(base_dir, 'src', 'executors', filename + '.tex'),
+        ]
+        
+        for path in paths_to_try:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                    # Рекурсивно обрабатываем вложенные \input
+                    return expand_inputs(file_content, os.path.dirname(path))
+        
+        # Если файл не найден, оставляем как есть
+        return match.group(0)
+    
+    # Обрабатываем \input{...} и \include{...}
+    content = re.sub(r'\\input\{([^}]+)\}', replace_input, content)
+    content = re.sub(r'\\include\{([^}]+)\}', replace_input, content)
+    
+    return content
+
+if __name__ == '__main__':
+    with open('main.tex', 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    expanded = expand_inputs(content)
+    
+    with open('main_expanded.tex', 'w', encoding='utf-8') as f:
+        f.write(expanded)
+    
+    print("Файлы объединены в main_expanded.tex")
+PYTHON_SCRIPT
+          fi
           
           # Метод 2: Конвертируем через pandoc с расширенным файлом
           echo "Конвертация в DOCX через pandoc..."
