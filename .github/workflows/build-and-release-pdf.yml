@@ -143,7 +143,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: pdf-${{ github.run_id }}-${{ github.run_number }}
-          name: PDF build ${{ github.run_id }}-${{ github.run_number }} (${{ github.event.head_commit.timestamp || github.run_id }})
+          name: PDF build ${{ github.run_id }}-${{ github.run_number }}
           draft: false
           prerelease: true
           files: |
@@ -258,7 +258,7 @@ jobs:
           # Создаем подпапку для сборки
           ensure_folder "$BUILD_FOLDER"
           
-          # Загружаем PDF
+          # Загружаем PDF (мы находимся в корне репозитория)
           upload_file "build/main.pdf" "${BUILD_FOLDER}/main.pdf"
           
           # Загружаем Word (если создан)
