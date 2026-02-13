@@ -27,11 +27,37 @@ jobs:
             texlive-pictures \
             texlive-luatex \
             biber \
-            make
+            make \
+            pandoc
 
       - name: Generate chapter lists and build PDF
         run: |
           make
+
+      - name: Convert LaTeX to Word document
+        run: |
+          cd build
+          # Попытка конвертации через pandoc
+          # Используем standalone режим для обработки включений
+          pandoc main.tex \
+            --from=latex+raw_tex \
+            --to=docx \
+            --output=main.docx \
+            --standalone \
+            --wrap=none \
+            --extract-media=media || \
+          pandoc main.tex \
+            --from=latex \
+            --to=docx \
+            --output=main.docx \
+            --standalone || \
+          echo "Warning: pandoc conversion completed with warnings, but file may be created"
+          
+          # Проверяем, что файл создан
+          if [ ! -f main.docx ]; then
+            echo "Error: Word document was not created"
+            exit 1
+          fi
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
@@ -39,7 +65,14 @@ jobs:
           name: dissertation-pdf
           path: build/main.pdf
 
-      - name: Create GitHub Release with PDF
+      - name: Upload Word artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dissertation-word
+          path: build/main.docx
+        continue-on-error: true
+
+      - name: Create GitHub Release with PDF and Word
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
@@ -49,5 +82,6 @@ jobs:
           prerelease: true
           files: |
             build/main.pdf
+            build/main.docx
 
 
