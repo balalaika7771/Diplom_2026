@@ -47,7 +47,9 @@ jobs:
         run: |
           make
 
-      - name: Convert LaTeX to Word document
+      - name: Convert PDF to DOCX via API
+        env:
+          CLOUDCONVERT_API_KEY: ${{ secrets.CLOUDCONVERT_API_KEY }}
         run: |
           cd build
           
@@ -60,7 +62,7 @@ jobs:
             fi
             
             # Проверяем размер (должен быть больше 20KB для надежности)
-            local FILE_SIZE=$(stat -f%z "$docx_file" 2>/dev/null || stat -c%s "$docx_file" 2>/dev/null || echo "0")
+            local FILE_SIZE=$(stat -c%s "$docx_file" 2>/dev/null || echo "0")
             if [ "$FILE_SIZE" -lt 20000 ]; then
               echo "  ❌ Файл слишком маленький ($FILE_SIZE байт)"
               return 1
@@ -78,231 +80,168 @@ jobs:
               return 1
             fi
             
-            # Проверяем наличие [Content_Types].xml
-            if ! unzip -l "$docx_file" 2>/dev/null | grep -q "\[Content_Types\].xml"; then
-              echo "  ❌ Отсутствует [Content_Types].xml"
-              return 1
-            fi
-            
             echo "  ✓ DOCX файл валиден (размер: $FILE_SIZE байт)"
             return 0
           }
           
-          CONVERSION_SUCCESS=false
-          
-          # Метод 1: PDF -> ODT -> DOCX через LibreOffice (более надежный способ)
-          echo "=== Метод 1: Конвертация PDF -> ODT -> DOCX через LibreOffice ==="
-          if [ -f main.pdf ]; then
-            PDF_SIZE=$(stat -f%z main.pdf 2>/dev/null || stat -c%s main.pdf 2>/dev/null || echo "0")
-            echo "PDF размер: $PDF_SIZE байт"
-            
-            if [ "$PDF_SIZE" -gt 10000 ]; then
-              # Шаг 1: PDF -> ODT
-              echo "Конвертация PDF в ODT..."
-              libreoffice --headless \
-                --nodefault \
-                --nolockcheck \
-                --nologo \
-                --norestore \
-                --convert-to odt \
-                --outdir . \
-                main.pdf 2>&1 | tee libreoffice.log
-              
-              if [ -f main.odt ] && [ -s main.odt ]; then
-                ODT_SIZE=$(stat -f%z main.odt 2>/dev/null || stat -c%s main.odt 2>/dev/null || echo "0")
-                echo "✓ ODT создан (размер: $ODT_SIZE байт)"
-                
-                # Шаг 2: ODT -> DOCX
-                echo "Конвертация ODT в DOCX..."
-                # Удаляем старый DOCX если есть
-                rm -f main.docx
-                
-                libreoffice --headless \
-                  --nodefault \
-                  --nolockcheck \
-                  --nologo \
-                  --norestore \
-                  --convert-to docx \
-                  --outdir . \
-                  main.odt 2>&1 | tee -a libreoffice.log
-                
-                # Ждем завершения конвертации
-                sleep 2
-                
-                if check_docx_valid main.docx; then
-                  FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-                  echo "✓ PDF успешно конвертирован в DOCX через ODT (размер: $FILE_SIZE байт)"
-                  CONVERSION_SUCCESS=true
-                else
-                  echo "⚠ DOCX файл невалиден, пробуем прямой метод..."
-                  rm -f main.docx
-                fi
-              fi
-              
-              # Если ODT метод не сработал, пробуем прямой PDF -> DOCX
-              if [ "$CONVERSION_SUCCESS" = false ]; then
-                echo "Попытка прямой конвертации PDF -> DOCX..."
-                rm -f main.docx
-                
-                libreoffice --headless \
-                  --nodefault \
-                  --nolockcheck \
-                  --nologo \
-                  --norestore \
-                  --convert-to docx \
-                  --outdir . \
-                  main.pdf 2>&1 | tee -a libreoffice.log
-                
-                # Ждем завершения конвертации
-                sleep 2
-                
-                if check_docx_valid main.docx; then
-                  FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-                  echo "✓ PDF успешно конвертирован в DOCX напрямую (размер: $FILE_SIZE байт)"
-                  CONVERSION_SUCCESS=true
-                else
-                  echo "⚠ Прямая конвертация не сработала, пробуем другой метод..."
-                  rm -f main.docx
-                fi
-              fi
-            else
-              echo "⚠ PDF файл слишком маленький, пропускаем конвертацию"
-            fi
-          else
-            echo "⚠ PDF файл не найден"
-          fi
-          
-          # Метод 2: LaTeX -> DOCX через pandoc (если PDF метод не сработал)
-          if [ "$CONVERSION_SUCCESS" = false ]; then
-            echo ""
-            echo "=== Метод 2: Конвертация LaTeX -> DOCX через pandoc ==="
-            
-            # Объединяем LaTeX файлы
-            if command -v latexpand &> /dev/null; then
-              echo "Объединение LaTeX файлов через latexpand..."
-              if [ -f main.bbl ]; then
-                latexpand --expand-bbl main.bbl main.tex > main_expanded.tex 2>&1 || \
-                latexpand main.tex > main_expanded.tex 2>&1
-              else
-                latexpand main.tex > main_expanded.tex 2>&1
-              fi
-              
-              if [ -s main_expanded.tex ]; then
-                echo "✓ Файлы объединены ($(wc -l < main_expanded.tex) строк)"
-                TEX_FILE="main_expanded.tex"
-              else
-                echo "⚠ latexpand не сработал, используем исходный main.tex"
-                TEX_FILE="main.tex"
-              fi
-            else
-              echo "latexpand не найден, используем исходный main.tex"
-              TEX_FILE="main.tex"
-            fi
-            
-            # Конвертируем через pandoc
-            echo "Конвертация через pandoc..."
-            pandoc "$TEX_FILE" \
-              --from=latex \
-              --to=docx \
-              --output=main.docx \
-              --standalone \
-              --wrap=none \
-              2>&1 | tee pandoc.log
-            
-            if check_docx_valid main.docx; then
-              FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-              echo "✓ Pandoc успешно создал DOCX (размер: $FILE_SIZE байт)"
-              CONVERSION_SUCCESS=true
-            else
-              echo "⚠ Pandoc создал невалидный DOCX, пробуем другой метод..."
-              rm -f main.docx
-            fi
-          fi
-          
-          # Метод 3: LaTeX -> ODT -> DOCX через LibreOffice
-          if [ "$CONVERSION_SUCCESS" = false ]; then
-            echo ""
-            echo "=== Метод 3: Конвертация LaTeX -> ODT -> DOCX ==="
-            
-            if [ -z "$TEX_FILE" ]; then
-              if [ -f main_expanded.tex ]; then
-                TEX_FILE="main_expanded.tex"
-              else
-                TEX_FILE="main.tex"
-              fi
-            fi
-            
-            echo "Конвертация LaTeX в ODT через htlatex..."
-            htlatex "$TEX_FILE" "odt" "" "" "-interaction=nonstopmode" 2>&1 | tail -30
-            
-            if [ -f "${TEX_FILE%.tex}.odt" ]; then
-              ODT_FILE="${TEX_FILE%.tex}.odt"
-            elif [ -f main_expanded.odt ]; then
-              ODT_FILE="main_expanded.odt"
-            else
-              ODT_FILE=""
-            fi
-            
-            if [ -n "$ODT_FILE" ] && [ -f "$ODT_FILE" ]; then
-              echo "Конвертация ODT в DOCX через LibreOffice..."
-              rm -f main.docx "${ODT_FILE%.odt}.docx"
-              
-              libreoffice --headless \
-                --nodefault \
-                --nolockcheck \
-                --nologo \
-                --norestore \
-                --convert-to docx \
-                --outdir . \
-                "$ODT_FILE" 2>&1 | tee -a libreoffice.log
-              
-              # Ждем завершения конвертации
-              sleep 2
-              
-              if [ -f "${ODT_FILE%.odt}.docx" ]; then
-                mv "${ODT_FILE%.odt}.docx" main.docx
-              fi
-              
-              if check_docx_valid main.docx; then
-                FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
-                echo "✓ ODT успешно конвертирован в DOCX (размер: $FILE_SIZE байт)"
-                CONVERSION_SUCCESS=true
-              else
-                echo "⚠ ODT -> DOCX конвертация не удалась"
-                rm -f main.docx
-              fi
-            fi
-          fi
-          
-          # Финальная проверка
-          echo ""
-          echo "=== Финальная проверка DOCX файла ==="
-          if [ "$CONVERSION_SUCCESS" = false ] || ! check_docx_valid main.docx; then
-            echo ""
-            echo "❌ Ошибка: Не удалось создать валидный Word документ"
-            echo "Размер файла: $(ls -lh main.docx 2>/dev/null || echo 'файл не существует')"
-            
-            if [ -f main.docx ]; then
-              echo ""
-              echo "Попытка диагностики DOCX файла:"
-              echo "Содержимое ZIP архива:"
-              unzip -l main.docx 2>&1 | head -20 || echo "Не удалось прочитать ZIP"
-            fi
-            
-            if [ -f pandoc.log ]; then
-              echo ""
-              echo "Последние строки лога pandoc:"
-              tail -30 pandoc.log
-            fi
-            if [ -f libreoffice.log ]; then
-              echo ""
-              echo "Последние строки лога LibreOffice:"
-              tail -30 libreoffice.log
-            fi
+          if [ ! -f main.pdf ]; then
+            echo "❌ PDF файл не найден"
             exit 1
           fi
           
-          FILE_SIZE=$(stat -f%z main.docx 2>/dev/null || stat -c%s main.docx 2>/dev/null || echo "0")
+          PDF_SIZE=$(stat -c%s main.pdf 2>/dev/null || echo "0")
+          echo "PDF размер: $PDF_SIZE байт"
+          
+          if [ "$PDF_SIZE" -lt 10000 ]; then
+            echo "⚠ PDF файл слишком маленький, пропускаем конвертацию"
+            exit 0
+          fi
+          
+          # Проверяем наличие API ключа
+          if [ -z "$CLOUDCONVERT_API_KEY" ]; then
+            echo "⚠ CLOUDCONVERT_API_KEY не установлен, пропускаем конвертацию в DOCX"
+            echo "Для использования API конвертации установите секрет CLOUDCONVERT_API_KEY в настройках репозитория"
+            exit 0
+          fi
+          
+          echo "=== Конвертация PDF в DOCX через CloudConvert API ==="
+          
+          # Устанавливаем curl и jq если нужно
+          if ! command -v curl &> /dev/null; then
+            echo "Установка curl..."
+            sudo apt-get update && sudo apt-get install -y curl
+          fi
+          
+          if ! command -v jq &> /dev/null; then
+            echo "Установка jq..."
+            sudo apt-get install -y jq
+          fi
+          
+          # Создаем job с задачами: import -> convert -> export
+          echo "Создание job для конвертации PDF -> DOCX..."
+          JOB_RESPONSE=$(curl -s -X POST "https://api.cloudconvert.com/v2/jobs" \
+            -H "Authorization: Bearer $CLOUDCONVERT_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "tasks": {
+                "import-1": {
+                  "operation": "import/upload"
+                },
+                "convert-1": {
+                  "operation": "convert",
+                  "input": "import-1",
+                  "output_format": "docx",
+                  "input_format": "pdf"
+                },
+                "export-1": {
+                  "operation": "export/url",
+                  "input": "convert-1"
+                }
+              }
+            }')
+          
+          JOB_ID=$(echo "$JOB_RESPONSE" | jq -r '.id // empty')
+          
+          if [ -z "$JOB_ID" ]; then
+            echo "Ошибка: не удалось создать job"
+            echo "Ответ API: $JOB_RESPONSE"
+            exit 1
+          fi
+          
+          echo "Job создан: $JOB_ID"
+          
+          # Получаем информацию о задаче импорта для загрузки файла
+          IMPORT_TASK_ID=$(echo "$JOB_RESPONSE" | jq -r '.tasks[] | select(.name == "import-1") | .id // empty')
+          
+          if [ -z "$IMPORT_TASK_ID" ]; then
+            echo "Ошибка: не удалось получить ID задачи импорта"
+            exit 1
+          fi
+          
+          echo "Получение URL для загрузки файла..."
+          IMPORT_TASK_INFO=$(curl -s -X GET "https://api.cloudconvert.com/v2/tasks/$IMPORT_TASK_ID" \
+            -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
+          
+          UPLOAD_URL=$(echo "$IMPORT_TASK_INFO" | jq -r '.result.form.url // empty')
+          
+          if [ -z "$UPLOAD_URL" ]; then
+            echo "Ошибка: не удалось получить URL для загрузки"
+            echo "Ответ API: $IMPORT_TASK_INFO"
+            exit 1
+          fi
+          
+          # Загружаем PDF файл
+          echo "Загрузка PDF файла..."
+          UPLOAD_RESPONSE=$(curl -s -X POST "$UPLOAD_URL" \
+            -F "file=@main.pdf")
+          
+          # Ждем завершения job
+          echo "Ожидание завершения конвертации..."
+          MAX_WAIT=600  # 10 минут максимум
+          WAIT_TIME=0
+          SLEEP_INTERVAL=3
+          
+          while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+            sleep $SLEEP_INTERVAL
+            WAIT_TIME=$((WAIT_TIME + SLEEP_INTERVAL))
+            
+            JOB_STATUS=$(curl -s -X GET "https://api.cloudconvert.com/v2/jobs/$JOB_ID" \
+              -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
+            
+            STATUS=$(echo "$JOB_STATUS" | jq -r '.status // empty')
+            echo "Статус job: $STATUS (ожидание: ${WAIT_TIME}с)"
+            
+            if [ "$STATUS" = "finished" ]; then
+              # Получаем информацию о задаче экспорта
+              EXPORT_TASK_ID=$(echo "$JOB_STATUS" | jq -r '.tasks[] | select(.name == "export-1") | .id // empty')
+              
+              if [ -n "$EXPORT_TASK_ID" ]; then
+                EXPORT_INFO=$(curl -s -X GET "https://api.cloudconvert.com/v2/tasks/$EXPORT_TASK_ID" \
+                  -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
+                
+                DOWNLOAD_URL=$(echo "$EXPORT_INFO" | jq -r '.result.files[0].url // empty')
+                
+                if [ -n "$DOWNLOAD_URL" ]; then
+                  echo "Скачивание DOCX файла..."
+                  curl -s -L "$DOWNLOAD_URL" -o main.docx
+                  
+                  if check_docx_valid main.docx; then
+                    FILE_SIZE=$(stat -c%s main.docx 2>/dev/null || echo "0")
+                    echo "✓ DOCX файл успешно создан через CloudConvert API (размер: $FILE_SIZE байт)"
+                    exit 0
+                  else
+                    echo "⚠ Скачанный файл невалиден"
+                    exit 1
+                  fi
+                else
+                  echo "Ошибка: не удалось получить URL для скачивания"
+                  echo "$EXPORT_INFO" | jq '.'
+                  exit 1
+                fi
+              else
+                echo "Ошибка: не удалось найти задачу экспорта"
+                exit 1
+              fi
+              break
+            elif [ "$STATUS" = "error" ]; then
+              echo "Ошибка конвертации"
+              echo "$JOB_STATUS" | jq '.'
+              exit 1
+            fi
+          done
+          
+          if [ $WAIT_TIME -ge $MAX_WAIT ]; then
+            echo "Таймаут ожидания конвертации (превышен лимит ${MAX_WAIT}с)"
+            exit 1
+          fi
+          
+          # Финальная проверка
+          if ! check_docx_valid main.docx; then
+            echo "❌ Ошибка: DOCX файл невалиден"
+            exit 1
+          fi
+          
+          FILE_SIZE=$(stat -c%s main.docx 2>/dev/null || echo "0")
           echo ""
           echo "✓ Word документ создан успешно и валиден (размер: $FILE_SIZE байт)"
           ls -lh main.docx
