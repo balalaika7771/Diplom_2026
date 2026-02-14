@@ -140,7 +140,7 @@ jobs:
               }
             }')
           
-          JOB_ID=$(echo "$JOB_RESPONSE" | jq -r '.id // empty')
+          JOB_ID=$(echo "$JOB_RESPONSE" | jq -r '.data.id // empty')
           
           if [ -z "$JOB_ID" ]; then
             echo "Ошибка: не удалось создать job"
@@ -151,7 +151,7 @@ jobs:
           echo "Job создан: $JOB_ID"
           
           # Получаем информацию о задаче импорта для загрузки файла
-          IMPORT_TASK_ID=$(echo "$JOB_RESPONSE" | jq -r '.tasks[] | select(.name == "import-1") | .id // empty')
+          IMPORT_TASK_ID=$(echo "$JOB_RESPONSE" | jq -r '.data.tasks[] | select(.name == "import-1") | .id // empty')
           
           if [ -z "$IMPORT_TASK_ID" ]; then
             echo "Ошибка: не удалось получить ID задачи импорта"
@@ -162,18 +162,26 @@ jobs:
           IMPORT_TASK_INFO=$(curl -s -X GET "https://api.cloudconvert.com/v2/tasks/$IMPORT_TASK_ID" \
             -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
           
-          UPLOAD_URL=$(echo "$IMPORT_TASK_INFO" | jq -r '.result.form.url // empty')
-          
+          UPLOAD_URL=$(echo "$IMPORT_TASK_INFO" | jq -r '.data.result.form.url // empty')
           if [ -z "$UPLOAD_URL" ]; then
             echo "Ошибка: не удалось получить URL для загрузки"
             echo "Ответ API: $IMPORT_TASK_INFO"
             exit 1
           fi
           
-          # Загружаем PDF файл
+          # Загружаем PDF файл (все параметры из form.parameters + file последним)
           echo "Загрузка PDF файла..."
-          UPLOAD_RESPONSE=$(curl -s -X POST "$UPLOAD_URL" \
-            -F "file=@main.pdf")
+          echo "$IMPORT_TASK_INFO" | python3 -c "
+          import json, sys, subprocess
+          data = json.load(sys.stdin)
+          url = data['data']['result']['form']['url']
+          params = data['data']['result']['form']['parameters']
+          cmd = ['curl', '-s', '-L', '-X', 'POST', url]
+          for k, v in params.items():
+              cmd.extend(['-F', f'{k}={v}'])
+          cmd.extend(['-F', 'file=@main.pdf'])
+          subprocess.run(cmd, check=True)
+          "
           
           # Ждем завершения job
           echo "Ожидание завершения конвертации..."
@@ -188,18 +196,18 @@ jobs:
             JOB_STATUS=$(curl -s -X GET "https://api.cloudconvert.com/v2/jobs/$JOB_ID" \
               -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
             
-            STATUS=$(echo "$JOB_STATUS" | jq -r '.status // empty')
+            STATUS=$(echo "$JOB_STATUS" | jq -r '.data.status // empty')
             echo "Статус job: $STATUS (ожидание: ${WAIT_TIME}с)"
             
             if [ "$STATUS" = "finished" ]; then
               # Получаем информацию о задаче экспорта
-              EXPORT_TASK_ID=$(echo "$JOB_STATUS" | jq -r '.tasks[] | select(.name == "export-1") | .id // empty')
+              EXPORT_TASK_ID=$(echo "$JOB_STATUS" | jq -r '.data.tasks[] | select(.name == "export-1") | .id // empty')
               
               if [ -n "$EXPORT_TASK_ID" ]; then
                 EXPORT_INFO=$(curl -s -X GET "https://api.cloudconvert.com/v2/tasks/$EXPORT_TASK_ID" \
                   -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
                 
-                DOWNLOAD_URL=$(echo "$EXPORT_INFO" | jq -r '.result.files[0].url // empty')
+                DOWNLOAD_URL=$(echo "$EXPORT_INFO" | jq -r '.data.result.files[0].url // empty')
                 
                 if [ -n "$DOWNLOAD_URL" ]; then
                   echo "Скачивание DOCX файла..."
