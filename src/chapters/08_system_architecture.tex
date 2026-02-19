@@ -1,238 +1,26 @@
 \chapter{Архитектура проектируемой системы}
 
-\section{Введение: проектирование интегрированной системы диагностики и восстановления}
+\section{Постановка задачи проектирования}
 
-Системы мониторинга, диагностики и восстановления часто реализуются как слабо связанные подсистемы, что приводит к задержкам между обнаружением инцидента, его анализом и выполнением действий восстановления. На практике это выражается в повышенном MTTR: результаты мониторинга передаются операторам, а анализ логов, локализация причины и выбор действий выполняются вручную.
+Системы мониторинга, диагностики и восстановления часто реализуются как слабо связанные подсистемы, что приводит к задержкам между обнаружением инцидента и выполнением действий восстановления. Проектируемая система автоматизирует замкнутый контур <<обнаружение--диагностика--решение--восстановление>>.
 
-Проектируемая система ориентирована на автоматизацию контура «обнаружение–диагностика–решение–восстановление» и интегрирует модули обнаружения аномалий, диагностики, принятия решений и безопасного выполнения действий. Модули функционируют автономно, их взаимодействие организовано так, чтобы минимизировать время восстановления при соблюдении требований к точности и безопасности.
-
-Основные требования к архитектуре:
-\begin{itemize}
-    \item Модульность — компоненты должны быть независимыми и заменяемыми
-    \item Расширяемость — возможность добавления новых методов обнаружения и диагностики
-    \item Безопасность — гарантии того, что действия восстановления не навредят системе
-    \item Производительность — способность обрабатывать большие объёмы данных в реальном времени
-    \item Надёжность — система должна продолжать работать даже при сбоях отдельных компонентов
-\end{itemize}
-
-В данной главе рассматриваются математические модели архитектуры системы, которые обеспечивают выполнение этих требований.
-
-\section{Проблема интеграции модулей обнаружения, диагностики и восстановления}
-
-Основная проблема заключается в отсутствии единой архитектуры, объединяющей все этапы процесса: от обнаружения аномалий до безопасного восстановления. Существующие системы работают изолированно, что создаёт задержки и снижает эффективность реагирования на инциденты.
-
-Математическая формулировка задачи: необходимо построить систему, которая минимизирует время восстановления:
-
+Формально задача: минимизировать время восстановления
 \begin{equation}
 \text{MTTR} = T_{\text{detection}} + T_{\text{diagnosis}} + T_{\text{recovery}} \to \min
 \label{eq:mttr_minimization}
 \end{equation}
-
 при ограничениях:
-
 \begin{align}
-P(\text{detection}) &> \theta_{\text{precision}} \label{eq:precision_constraint} \\
-P(\text{false\_positive}) &< \theta_{\text{fpr}} \label{eq:fpr_constraint} \\
-P(\text{safe\_recovery}) &> \theta_{\text{safety}} \label{eq:safety_constraint}
+P(\text{detection}) &> \theta_{\text{precision}}, \label{eq:precision_constraint} \\
+P(\text{false\_positive}) &< \theta_{\text{fpr}}, \label{eq:fpr_constraint} \\
+P(\text{safe\_recovery}) &> \theta_{\text{safety}}. \label{eq:safety_constraint}
 \end{align}
 
-где $\theta_{\text{precision}}, \theta_{\text{fpr}}, \theta_{\text{safety}}$ — пороговые значения точности, ложных срабатываний и безопасности.
+Требования к архитектуре: модульность (независимость и заменяемость компонентов), расширяемость, безопасность действий восстановления, обработка данных в реальном времени, отказоустойчивость.
 
-\section{Архитектурные принципы: решение проблемы модульности}
+\section{Модули системы}
 
-Принцип модульности обеспечивает независимость компонентов и возможность их замены. Проблема монолитных систем — сложность изменений и тестирования.
-
-Для количественной оценки модульности системы рассмотрим её разбиение на модули: $M = \{M_1, M_2, \ldots, M_n\}$.
-
-Связанность модулей (coupling):
-
-\begin{equation}
-C(M_i, M_j) = \frac{|\text{interfaces}(M_i, M_j)|}{|\text{interfaces}(M_i)| + |\text{interfaces}(M_j)|}
-\label{eq:coupling}
-\end{equation}
-
-где $\text{interfaces}(M_i, M_j)$ — множество интерфейсов между модулями $M_i$ и $M_j$.
-
-Связность модуля (cohesion):
-
-\begin{equation}
-H(M_i) = \frac{|\text{internal\_dependencies}(M_i)|}{|\text{all\_dependencies}(M_i)|}
-\label{eq:cohesion}
-\end{equation}
-
-Принцип высокой связности и низкой связанности:
-
-\begin{equation}
-\forall i: H(M_i) \to \max, \quad \forall i \neq j: C(M_i, M_j) \to \min
-\label{eq:modularity_principle}
-\end{equation}
-
-\section{Модули системы: решение проблемы специализации}
-
-Каждый модуль решает специфическую задачу, что обеспечивает эффективность и возможность независимого масштабирования.
-
-\subsection{Data Collector: проблема агрегации разнородных данных}
-
-Различные источники данных (Prometheus, ELK, Jaeger) имеют различные форматы и протоколы \cite{prometheus_docs,elasticsearch_docs,jaeger_docs,opentelemetry}. Проблема заключается в унификации данных для последующего анализа.
-
-Пусть входные данные из источника $i$ представляются как $D_i = \{d_{i,1}, d_{i,2}, \ldots\}$.
-
-Функция нормализации:
-
-\begin{equation}
-D_{\text{normalized}} = \bigcup_{i=1}^{n} f_{\text{normalize},i}(D_i)
-\label{eq:data_normalization}
-\end{equation}
-
-где $f_{\text{normalize},i}$ — функция нормализации для источника $i$.
-
-Единая модель данных:
-
-\begin{equation}
-d = (\text{timestamp}, \text{source}, \text{type}, \text{value}, \text{metadata})
-\label{eq:unified_data_model}
-\end{equation}
-
-где $\text{type} \in \{\text{metric}, \text{log}, \text{trace}\}$.
-
-Время сбора данных:
-
-\begin{equation}
-T_{\text{collection}} = \max_{i=1}^{n} T_{\text{collect},i}
-\label{eq:collection_time}
-\end{equation}
-
-где $T_{\text{collect},i}$ — время сбора данных из источника $i$.
-
-\subsection{Anomaly Analyzer: проблема многомерного анализа}
-
-Аномалии могут проявляться в различных измерениях данных. Проблема заключается в объединении результатов различных методов обнаружения.
-
-Для объединения результатов различных методов рассмотрим результат метода $i$ как $r_i \in [0, 1]$ — оценку аномальности.
-
-Взвешенное объединение результатов:
-
-\begin{equation}
-\text{Anomaly Score} = \sum_{i=1}^{m} w_i \cdot r_i, \quad \sum_{i=1}^{m} w_i = 1
-\label{eq:ensemble_anomaly}
-\end{equation}
-
-где $w_i$ — вес метода $i$, определяется на основе его точности:
-
-\begin{equation}
-w_i = \frac{\exp(\alpha \cdot \text{accuracy}_i)}{\sum_{j=1}^{m} \exp(\alpha \cdot \text{accuracy}_j)}
-\label{eq:method_weight}
-\end{equation}
-
-где $\alpha$ — параметр температуры.
-
-Финальное решение:
-
-\begin{equation}
-\text{Anomaly} = \begin{cases}
-\text{true} & \text{если } \text{Anomaly Score} > \theta \\
-\text{false} & \text{иначе}
-\end{cases}
-\label{eq:anomaly_decision}
-\end{equation}
-
-\subsection{LLM Agent: проблема анализа неструктурированных данных и помощи разработчикам}
-
-Традиционные модули работают со структурированными данными — метриками и трейсами. Однако значительная часть информации о проблемах содержится в неструктурированных текстовых логах. Модуль LLM Agent использует большие языковые модели для анализа логов, генерации объяснений проблем и помощи разработчикам в быстром исправлении проблем.
-
-Модуль получает на вход логи $L$, контекст от Diagnostic Engine $C$ и генерирует рекомендации для разработчиков следующим образом:
-
-\begin{equation}
-\text{Recommendations} = \text{LLM-Agent}(L, C, \text{Metrics}, \text{Traces})
-\label{eq:llm_agent_recommendations}
-\end{equation}
-
-Время генерации рекомендаций:
-
-\begin{equation}
-T_{\text{llm}} = T_{\text{log\_filtering}} + T_{\text{context\_preparation}} + T_{\text{llm\_inference}} + T_{\text{postprocessing}}
-\label{eq:llm_agent_time}
-\end{equation}
-
-где $T_{\text{log\_filtering}}$ — время фильтрации релевантных логов, $T_{\text{context\_preparation}}$ — время подготовки контекста для LLM, $T_{\text{llm\_inference}}$ — время инференса LLM, $T_{\text{postprocessing}}$ — время обработки ответа.
-
-Качество рекомендаций оценивается через метрику:
-
-\begin{equation}
-\text{Quality} = \alpha \cdot \text{Accuracy} + \beta \cdot \text{Time\_to\_Fix} + \gamma \cdot \text{Developer\_Satisfaction}
-\label{eq:llm_quality_metric}
-\end{equation}
-
-где $\text{Time\_to\_Fix}$ — время, которое разработчик потратил на исправление проблемы с помощью рекомендаций, $\text{Developer\_Satisfaction}$ — оценка разработчика полезности рекомендаций.
-
-Интеграция с другими модулями:
-
-\begin{equation}
-\text{Final Action} =
-  \begin{cases}
-    \text{Orchestrator Decision},
-      & \text{если } \text{confidence}(\text{orchestrator}) > \theta, \\
-    \text{LLM Recommendation},
-      & \text{если } \text{confidence}(\text{llm}) > \theta \\
-      & \quad \land \text{needs\_human\_review}, \\
-    \text{Human Review},
-      & \text{иначе}.
-  \end{cases}
-\label{eq:llm_integration}
-\end{equation}
-
-\subsection{Diagnostic Engine: проблема построения причинно-следственных графов}
-
-Определение корневой причины инцидента требует анализа причинно-следственных связей между событиями. Проблема заключается в неполноте данных и неопределённости связей.
-
-Причинно-следственный граф представляется как $G = (V, E)$, где $V$ — множество вершин (события, метрики, сервисы), $E$ — множество рёбер (причинно-следственные связи). Матрица смежности определяется следующим образом:
-
-\begin{equation}
-\mathbf{A}_{ij} = \begin{cases}
-1 & \text{если } P(v_i \to v_j) > \theta \\
-0 & \text{иначе}
-\end{cases}
-\label{eq:adjacency_matrix}
-\end{equation}
-
-Вероятность причинно-следственной связи:
-
-\begin{equation}
-P(v_i \to v_j | \mathbf{m}, \mathbf{l}, \mathbf{t}) = \sigma\left(\sum_{k} w_k \cdot f_k(v_i, v_j, \mathbf{m}, \mathbf{l}, \mathbf{t})\right)
-\label{eq:causal_probability}
-\end{equation}
-
-где $f_k$ — функции признаков:
-\begin{itemize}
-    \item Временная близость: $f_{\text{time}}(v_i, v_j) = \exp(-|t_i - t_j|/\tau)$
-    \item Корреляция: $f_{\text{corr}}(v_i, v_j) = |\rho(v_i, v_j)|$
-    \item Зависимость в трейсе: $f_{\text{trace}}(v_i, v_j) = \mathbf{1}[\text{parent}(v_j) = v_i]$
-\end{itemize}
-
-Критерий причинности (Granger causality) \cite{lamport_distributed_systems,lynch_distributed_algorithms}:
-
-\begin{equation}
-v_j \text{ causes } v_i \Leftrightarrow \text{var}(\epsilon_{i|v_j}) < \text{var}(\epsilon_{i|\neg v_j})
-\label{eq:granger_causality}
-\end{equation}
-
-где $\epsilon_{i|v_j}$ — ошибка предсказания $v_i$ с учётом $v_j$.
-
-Построение графа:
-
-\begin{equation}
-G = \{(v_i, v_j) : P(v_i \to v_j) > \theta \land \text{Granger}(v_j, v_i)\}
-\label{eq:causal_graph_building}
-\end{equation}
-
-Поиск корневой причины:
-
-\begin{equation}
-\text{RootCause} = \arg\min_{v \in V} \left[ \text{in-degree}(v) + \lambda \cdot (1 - P(\text{anomaly}|v)) \right]
-\label{eq:root_cause}
-\end{equation}
-
-где $\lambda$ — параметр баланса между структурой графа и вероятностью аномалии.
+Архитектура включает шесть модулей, организованных в конвейер обработки инцидентов.
 
 \begin{figure}[H]
 \centering
@@ -243,7 +31,7 @@ G = \{(v_i, v_j) : P(v_i \to v_j) > \theta \land \text{Granger}(v_j, v_i)\}
     \node[rectangle, draw, fill=purple!20, above=of diagnostic, minimum width=1cm, minimum height=0.6cm] (llm_agent) {LLM};
     \node[rectangle, draw, fill=red!20, below=of analyzer, minimum width=1cm, minimum height=0.6cm] (orchestrator) {Orchestrator};
     \node[rectangle, draw, fill=orange!20, below=of orchestrator, minimum width=1cm, minimum height=0.6cm] (executor) {Executor};
-    
+
     \draw[->, shorten >=2pt, shorten <=2pt] (collector) -- (analyzer);
     \draw[->, shorten >=2pt, shorten <=2pt] (analyzer) -- (diagnostic);
     \draw[->, shorten >=2pt, shorten <=2pt] (diagnostic) -- (orchestrator);
@@ -257,112 +45,118 @@ G = \{(v_i, v_j) : P(v_i \to v_j) > \theta \land \text{Granger}(v_j, v_i)\}
 \label{fig:system_architecture}
 \end{figure}
 
-\section{Механизмы оркестрации: проблема координации множественных агентов}
+\subsection{Data Collector}
 
-При наличии нескольких агентов необходимо координировать их действия для избежания конфликтов \cite{wooldridge_agents,multi_agent_systems}. Проблема заключается в достижении консенсуса при различных мнениях агентов \cite{herlihy_art_multiprocessor}.
-
-Рассмотрим множество агентов $\mathcal{A} = \{A_1, A_2, \ldots, A_n\}$.
-
-Мнение агента $A_i$ о действии $a$:
-
+Модуль агрегирует данные из разнородных источников (Prometheus, Elasticsearch, Jaeger) \cite{prometheus_docs,elasticsearch_docs,jaeger_docs,opentelemetry}, приводя их к единой модели:
 \begin{equation}
-o_i(a) \in [0, 1]
-\label{eq:agent_opinion}
+d = (\text{timestamp}, \text{source}, \text{type}, \text{value}, \text{metadata}), \quad \text{type} \in \{\text{metric}, \text{log}, \text{trace}\}
+\label{eq:unified_data_model}
 \end{equation}
 
-Вес агента на основе его точности:
+Нормализация выполняется для каждого источника: $D_{\text{normalized}} = \bigcup_{i=1}^{n} f_{\text{normalize},i}(D_i)$. Время сбора определяется самым медленным источником: $T_{\text{collection}} = \max_{i} T_{\text{collect},i}$.
 
+\subsection{Anomaly Analyzer}
+
+Модуль объединяет результаты нескольких методов обнаружения (глава~6) через ансамблевую оценку:
+\begin{equation}
+\text{Anomaly Score} = \sum_{i=1}^{m} w_i \cdot r_i, \quad w_i = \frac{\exp(\alpha \cdot \text{accuracy}_i)}{\sum_{j=1}^{m} \exp(\alpha \cdot \text{accuracy}_j)}
+\label{eq:ensemble_anomaly}
+\end{equation}
+где $r_i \in [0, 1]$ --- оценка аномальности метода $i$, $\alpha$ --- параметр температуры. Решение: $\text{Anomaly} = \mathbf{1}[\text{Anomaly Score} > \theta]$.
+
+\subsection{LLM Agent}
+
+Модуль анализирует неструктурированные логи и генерирует рекомендации для разработчиков, используя большие языковые модели через Model Context Protocol (глава~10):
+\begin{equation}
+\text{Recommendations} = \text{LLM-Agent}(L, C, \text{Metrics}, \text{Traces})
+\label{eq:llm_agent_recommendations}
+\end{equation}
+
+Интеграция с остальной системой:
+\begin{equation}
+\text{Final Action} =
+  \begin{cases}
+    \text{Orchestrator Decision},
+      & \text{если } \text{confidence}_{\text{orch}} > \theta, \\
+    \text{LLM Recommendation},
+      & \text{если } \text{confidence}_{\text{llm}} > \theta \land \text{needs\_human\_review}, \\
+    \text{Human Review},
+      & \text{иначе}.
+  \end{cases}
+\label{eq:llm_integration_arch}
+\end{equation}
+
+Такая трёхуровневая схема обеспечивает эскалацию: при высокой уверенности автоматических агентов действия выполняются немедленно; при средней уверенности LLM формирует рекомендации для разработчиков; при низкой --- инцидент передаётся человеку.
+
+\subsection{Diagnostic Engine}
+
+Модуль строит причинно-следственный граф инцидента $G = (V, E)$, где вершины --- сервисы и события, рёбра --- причинные связи. Вероятность связи определяется тремя признаками (аналогично~(\ref{eq:causal_probability})):
+\begin{equation}
+P(v_i \to v_j) = \sigma\left(\sum_{k} w_k \cdot f_k(v_i, v_j)\right)
+\label{eq:causal_probability_arch}
+\end{equation}
+\begin{itemize}
+    \item Временная близость: $f_{\text{time}}(v_i, v_j) = \exp(-|t_i - t_j|/\tau)$
+    \item Корреляция метрик: $f_{\text{corr}}(v_i, v_j) = |\rho(v_i, v_j)|$
+    \item Зависимость в трейсе: $f_{\text{trace}}(v_i, v_j) = \mathbf{1}[\text{parent}(v_j) = v_i]$
+\end{itemize}
+
+Рёбра включаются в граф при условии $P(v_i \to v_j) > \theta$ и подтверждения причинности по критерию Грейнджера \cite{lamport_distributed_systems,lynch_distributed_algorithms}:
+\begin{equation}
+v_j \text{ causes } v_i \Leftrightarrow \text{var}(\epsilon_{i|v_j}) < \text{var}(\epsilon_{i|\neg v_j})
+\label{eq:granger_causality_arch}
+\end{equation}
+
+Поиск корневой причины:
+\begin{equation}
+\text{RootCause} = \arg\min_{v \in V} \left[ \text{in-degree}(v) + \lambda \cdot (1 - P(\text{anomaly}|v)) \right]
+\label{eq:root_cause}
+\end{equation}
+
+Алгоритм выбирает вершину с минимальным числом входящих рёбер (<<начальная>> точка каскада) и максимальной вероятностью аномалии.
+
+\section{Механизм консенсуса агентов}
+
+При наличии нескольких источников рекомендаций (Diagnostic Engine, LLM-агент, rule-based политики) необходимо согласование \cite{wooldridge_agents,multi_agent_systems,herlihy_art_multiprocessor}. Мнение агента $A_i$ о действии $a$: $o_i(a) \in [0, 1]$. Вес определяется исторической точностью:
 \begin{equation}
 w_i = \frac{\exp(\alpha \cdot \text{accuracy}_i)}{\sum_{j=1}^{n} \exp(\alpha \cdot \text{accuracy}_j)}
 \label{eq:agent_weight}
 \end{equation}
 
-где $\text{accuracy}_i$ — историческая точность агента $A_i$, $\alpha$ — параметр температуры.
-
 Консенсусное решение:
-
 \begin{equation}
 \text{Decision} = \arg\max_{a \in \mathcal{A}} \sum_{i=1}^{n} w_i \cdot o_i(a)
 \label{eq:consensus}
 \end{equation}
 
-Алгоритм консенсуса DeGroot:
-
+Для итеративного согласования используется алгоритм DeGroot:
 \begin{equation}
-o_i^{(t+1)}(a) = \sum_{j=1}^{n} T_{ij} \cdot o_j^{(t)}(a)
+o_i^{(t+1)}(a) = \sum_{j=1}^{n} T_{ij} \cdot o_j^{(t)}(a), \quad \lim_{t \to \infty} o_i^{(t)}(a) = \bar{o}(a)
 \label{eq:degroot_consensus}
 \end{equation}
+где $T_{ij}$ --- элемент матрицы доверия ($\sum_j T_{ij} = 1$). Сходимость гарантирована при $\lambda_2(T) < 1$.
 
-где $T_{ij}$ — элемент матрицы доверия, $\sum_{j} T_{ij} = 1$.
-
-Условие сходимости к консенсусу:
-
-\begin{equation}
-\lim_{t \to \infty} o_i^{(t)}(a) = \bar{o}(a) = \frac{1}{n} \sum_{i=1}^{n} o_i^{(0)}(a)
-\label{eq:consensus_convergence}
-\end{equation}
-
-Скорость сходимости определяется вторым по величине собственным значением матрицы $T$:
-
-\begin{equation}
-\lambda_2(T) < 1 \Rightarrow \text{convergence}
-\label{eq:convergence_condition}
-\end{equation}
-
-Взвешенное голосование:
-
+\textbf{Разрешение конфликтов.} При расхождении рекомендаций (например, Diagnostic Engine предлагает масштабирование, а LLM --- включение circuit breaker) оркестратор использует взвешенное голосование:
 \begin{equation}
 \text{Vote}(a) = \sum_{i=1}^{n} w_i \cdot \mathbf{1}[o_i(a) > \theta_{\text{support}}]
 \label{eq:weighted_voting}
 \end{equation}
 
-где $\theta_{\text{support}}$ — порог поддержки действия.
+Решение принимается, если $\text{Vote}(a^*) > \theta_{\text{consensus}} \cdot \sum_i w_i$; при отсутствии консенсуса действие передаётся на ручную обработку.
 
-Порог принятия решения:
+\section{Безопасное исполнение решений}
 
-\begin{equation}
-\text{Decision} = \begin{cases}
-a^* & \text{если } \text{Vote}(a^*) > \theta_{\text{consensus}} \cdot \sum_{i=1}^{n} w_i \\
-\text{abstain} & \text{иначе}
-\end{cases}
-\label{eq:decision_threshold}
-\end{equation}
-
-где $\theta_{\text{consensus}} \in [0,1]$ — порог консенсуса.
-
-\section{Безопасное исполнение решений: проблема минимизации рисков}
-
-Автоматическое выполнение действий по восстановлению несёт риски ошибок. Проблема заключается в обеспечении безопасности при сохранении эффективности.
-
-Вероятность успешного выполнения действия определяется как произведение вероятностей успеха на каждом этапе валидации:
-
+Автоматическое выполнение действий восстановления несёт риски. Вероятность успеха определяется как произведение вероятностей на каждом этапе валидации:
 \begin{equation}
 P(\text{success}|a, s) = \prod_{i=1}^{k} P_i(\text{success}|a, s)
 \label{eq:success_probability}
 \end{equation}
 
-где $P_i$ — вероятность успеха на этапе $i$ валидации, $k$ — количество этапов валидации.
-
-Ожидаемая полезность с учётом риска:
-
-\begin{equation}
-EU(a, s) =
-  P(\text{success} \mid a, s) \cdot U(\text{success}, a, s)
-  + (1 - P(\text{success} \mid a, s)) \cdot U(\text{failure}, a, s)
-\label{eq:expected_utility}
-\end{equation}
-
-где $U(\text{success}, a, s)$ — полезность успешного выполнения, $U(\text{failure}, a, s)$ — полезность (отрицательная) при неудаче.
-
-Функция риска:
-
+Функция риска и критерий безопасности:
 \begin{equation}
 \text{Risk}(a, s) = P(\text{failure}|a, s) \cdot \text{Cost}(\text{failure}, a, s)
 \label{eq:risk_function}
 \end{equation}
-
-Критерий безопасности:
-
 \begin{equation}
 \text{Safe}(a, s) = \begin{cases}
 \text{true} & \text{если } \text{Risk}(a, s) < \theta_{\text{risk}} \land P(\text{success}|a, s) > \theta_{\text{success}} \\
@@ -371,64 +165,34 @@ EU(a, s) =
 \label{eq:safety_criterion}
 \end{equation}
 
-где $\theta_{\text{risk}}$ — максимально допустимый риск, $\theta_{\text{success}}$ — минимально допустимая вероятность успеха.
+\textbf{Постепенное применение} (gradual rollout): действие применяется на долю $\alpha \in [0,1]$ инфраструктуры. При успешной верификации $\alpha$ увеличивается до~1; при ухудшении метрик --- инициируется откат.
 
-Постепенное применение (gradual rollout):
-
-\begin{equation}
-\text{Apply}(a, s, \alpha) = \begin{cases}
-\text{partial} & \text{если } \alpha < 1 \land \text{Safe}(a, s) \\
-\text{full} & \text{если } \alpha = 1 \land \text{Safe}(a, s) \land \text{Verify}(\alpha) \\
-\text{abort} & \text{иначе}
-\end{cases}
-\label{eq:gradual_application}
-\end{equation}
-
-где $\alpha \in [0,1]$ — доля применения действия, $\text{Verify}(\alpha)$ — функция верификации на доле $\alpha$.
-
-Модель отката (rollback):
-
-При обнаружении ошибки система откатывается к предыдущему состоянию:
-
+\textbf{Модель отката:}
 \begin{equation}
 \text{Rollback}(s_t, s_{t-k}) = \arg\min_{a \in \mathcal{A}_{\text{rollback}}} \left[ \|s_t - s_{t-k}\| + \lambda \cdot \text{Cost}(a) \right]
 \label{eq:rollback_model}
 \end{equation}
+где $s_{t-k}$ --- сохранённое состояние до применения действия.
 
-где $s_{t-k}$ — состояние $k$ шагов назад, $\lambda$ — параметр стоимости отката, $\|\cdot\|$ — метрика расстояния между состояниями.
-
-Вероятность успешного отката:
-
-\begin{equation}
-P(\text{rollback\_success}) = P(\text{state\_saved}) \cdot P(\text{rollback\_executable})
-\label{eq:rollback_success}
-\end{equation}
-
-Ограничение изменений для предотвращения каскадных эффектов:
-
+\textbf{Ограничение каскадных изменений:}
 \begin{equation}
 \sum_{i=1}^{n} |\Delta m_i| \leq \Delta_{\max}
 \label{eq:change_limit}
 \end{equation}
 
-где $\Delta m_i$ — изменение метрики $m_i$, $\Delta_{\max}$ — максимально допустимое суммарное изменение.
+Это ограничение предотвращает ситуацию, когда серия малых действий в совокупности приводит к критическому изменению состояния системы.
 
-Уровни безопасности определяются через функцию риска:
-
+\textbf{Уровни безопасности} определяют режим исполнения:
 \begin{equation}
 \text{SafetyLevel}(a) = \begin{cases}
-\text{Low} & \text{если } \text{Risk}(a) < \theta_1 \\
-\text{Medium} & \text{если } \theta_1 \leq \text{Risk}(a) < \theta_2 \\
-\text{High} & \text{если } \theta_2 \leq \text{Risk}(a) < \theta_3 \\
-\text{Critical} & \text{если } \text{Risk}(a) \geq \theta_3
+\text{Low} & \text{если } \text{Risk}(a) < \theta_1 \quad \text{(автоматическое)} \\
+\text{Medium} & \text{если } \theta_1 \leq \text{Risk}(a) < \theta_2 \quad \text{(gradual rollout)} \\
+\text{High} & \text{если } \theta_2 \leq \text{Risk}(a) < \theta_3 \quad \text{(с подтверждением)} \\
+\text{Critical} & \text{если } \text{Risk}(a) \geq \theta_3 \quad \text{(только вручную)}
 \end{cases}
 \label{eq:safety_levels}
 \end{equation}
 
-где $\theta_1 < \theta_2 < \theta_3$ — пороговые значения риска.
+\medskip
 
-Изложенная архитектура системы интеллектуальных агентов задаёт формальный каркас интеграции модулей сбора данных, анализа аномалий, причинно-следственной диагностики, оркестрации решений и безопасного исполнения. Оптимизационная постановка задачи минимизации MTTR при ограничениях на точность, частоту ложных срабатываний и уровень риска Recovery-действий определяет критерии качества для всей цепочки обработки инцидентов.
-
-Принципы модульности, унификации данных и ансамблевого анализа аномалий обеспечивают устойчивость архитектуры к расширению и замене отдельных методов, а причинно-следственный граф и механизмы консенсуса между агентами формализуют путь от наблюдаемых симптомов к выбору конкретных действий. Встроенные критерии безопасности и поддержка LLM-агента для работы с неструктурированными логами обеспечивают как строгость автоматических решений, так и возможность их верификации и уточнения человеком.
-
-В дальнейшем, при реализации прототипа и проведении экспериментов, данная архитектура служит инвариантной основой: отдельные алгоритмы обнаружения, диагностики и принятия решений могут варьироваться, но структура взаимодействия модулей и используемые количественные критерии остаются неизменными.
+Архитектура задаёт формальный каркас интеграции модулей: оптимизация MTTR при ограничениях на точность и безопасность, ансамблевый анализ аномалий, причинно-следственная диагностика и многоуровневая система безопасности исполнения. В главе~10 данная архитектура реализуется в виде прототипа, а в главе~11 проходит экспериментальную проверку.

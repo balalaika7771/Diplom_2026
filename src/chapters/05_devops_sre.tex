@@ -1,435 +1,102 @@
 \chapter{DevOps, SRE и архитектуры обеспечения стабильности}
 
-\section{Введение: что такое DevOps и SRE}
+\section{DevOps и автоматизация доставки}
 
-DevOps и SRE представляют собой инженерные практики, направленные на обеспечение стабильности и надёжности систем.
+DevOps объединяет разработку и эксплуатацию в единый процесс с автоматизацией всех этапов жизненного цикла ПО \cite{kim_devops_handbook,devops_culture}. SRE (Site Reliability Engineering) применяет инженерные принципы к задачам эксплуатации, фокусируясь на надёжности, производительности и автоматизации \cite{google_sre_book,sre_principles}. Обе практики формируют инфраструктурный слой, в который встраиваются автономные агенты.
 
-Традиционный подход к разработке программного обеспечения разделяет процесс на две части: разработку и эксплуатацию. Разработчики пишут код и передают его операторам, которые развёртывают его на серверах и поддерживают работу системы. Проблема этого подхода заключается в том, что разработчики не знают, как их код ведёт себя в реальных условиях, а операторы не понимают, почему система работает именно так, а не иначе.
-
-DevOps (Development + Operations) — это подход, который объединяет разработку и эксплуатацию в единый процесс \cite{kim_devops_handbook,devops_culture}. Основная идея DevOps заключается в автоматизации всех этапов жизненного цикла программного обеспечения: от написания кода до его развёртывания и мониторинга \cite{continuous_deployment}. Это позволяет быстрее доставлять изменения пользователям и быстрее обнаруживать и исправлять проблемы.
-
-SRE (Site Reliability Engineering) — это дисциплина, которая применяет принципы разработки программного обеспечения к задачам эксплуатации \cite{google_sre_book,sre_principles}. SRE-инженеры фокусируются на обеспечении надёжности, производительности и доступности систем. Они используют автоматизацию для уменьшения ручной работы и применяют математические модели для оценки и улучшения надёжности систем.
-
-Основные проблемы, которые решают DevOps и SRE:
-\begin{itemize}
-    \item Длительный цикл доставки: от написания кода до его развёртывания проходит много времени
-    \item Конфликты при интеграции изменений: когда несколько разработчиков работают над одним проектом
-    \item Проблемы при развёртывании: ручное развёртывание подвержено ошибкам
-    \item Долгое восстановление после сбоев: обнаружение и устранение проблем занимает много времени
-    \item Отсутствие автоматического самовосстановления: система не может сама исправить проблемы
-    \item Сложность управления конфигурацией: настройки системы хранятся в разных местах
-\end{itemize}
-
-В данной главе рассматриваются математические модели для решения этих проблем.
-
-\section{Проблема разрыва между разработкой и эксплуатацией}
-
-Традиционный подход разделяет разработку и эксплуатацию, что приводит к длительному циклу доставки и проблемам при развёртывании. Проблема заключается в отсутствии автоматизации и стандартизации процессов.
-
-Для количественной оценки эффективности процесса доставки рассмотрим его временные характеристики. Время от коммита до production складывается из следующих компонентов:
-
+Время доставки изменений:
 \begin{equation}
 T_{\text{delivery}} = T_{\text{build}} + T_{\text{test}} + T_{\text{deploy}} + T_{\text{verify}}
 \label{eq:delivery_time}
 \end{equation}
 
-где $T_{\text{build}}$ — время сборки, $T_{\text{test}}$ — время тестирования, $T_{\text{deploy}}$ — время развёртывания, $T_{\text{verify}}$ — время верификации.
-
-Частота развёртываний:
-
-\begin{equation}
-f_{\text{deploy}} = \frac{N_{\text{deploys}}}{T_{\text{period}}}
-\label{eq:deploy_frequency}
-\end{equation}
-
-где $N_{\text{deploys}}$ — количество развёртываний за период $T_{\text{period}}$.
-
-Время восстановления после инцидента (MTTR):
-
+Время восстановления после инцидента:
 \begin{equation}
 \text{MTTR} = T_{\text{detection}} + T_{\text{diagnosis}} + T_{\text{recovery}} + T_{\text{verification}}
 \label{eq:mttr_components}
 \end{equation}
 
-Решение через DevOps: автоматизация всех этапов цикла доставки \cite{weaveworks_gitops}.
+Именно $T_{\text{diagnosis}}$ и $T_{\text{recovery}}$ являются целевыми компонентами для автоматизации агентами --- на них приходится 60--80\% MTTR в типичных организациях \cite{continuous_deployment}.
 
-\section{Continuous Integration: проблема интеграции изменений}
+\section{GitOps и декларативное управление}
 
-При работе нескольких разработчиков интеграция изменений создаёт конфликты и ошибки. Проблема заключается в обнаружении проблем на поздних этапах разработки.
-
-Вероятность успешной сборки при $n$ коммитах можно оценить следующим образом:
-
+GitOps формализует управление инфраструктурой через декларативное описание желаемого состояния в Git \cite{weaveworks_gitops}:
 \begin{equation}
-P(\text{success}|n) = \prod_{i=1}^{n} (1 - p_{\text{error},i})
-\label{eq:ci_success}
+\Delta S = S_{\text{desired}} - S_{\text{current}}, \quad \text{если } \Delta S \neq \emptyset \text{ то } S_{\text{current}} \leftarrow S_{\text{desired}}
+\label{eq:gitops}
 \end{equation}
 
-где $p_{\text{error},i}$ — вероятность ошибки в коммите $i$.
+Откат изменений через \texttt{git revert} обеспечивает гарантированное возвращение к предыдущему состоянию. Агенты восстановления используют аналогичный принцип: Safe Executor сохраняет состояние перед действием и при ухудшении метрик выполняет откат к сохранённому состоянию (формула \ref{eq:rollback_model}).
 
-При независимых коммитах с одинаковой вероятностью ошибки $p$:
+\section{Механизмы самовосстановления Kubernetes}
 
+Kubernetes обеспечивает базовый уровень самовосстановления \cite{burns_kubernetes,kubernetes_self_healing,kubernetes_docs}, на который надстраиваются агенты.
+
+Liveness probe проверяет работоспособность контейнера, readiness probe --- готовность принимать трафик:
 \begin{equation}
-P(\text{success}|n) = (1 - p)^n
-\label{eq:ci_success_independent}
-\end{equation}
-
-Вероятность хотя бы одной ошибки:
-
-\begin{equation}
-P(\text{failure}|n) = 1 - (1 - p)^n
-\label{eq:ci_failure}
-\end{equation}
-
-Время обнаружения ошибки:
-
-\begin{equation}
-T_{\text{detection}} = T_{\text{commit}} + T_{\text{build}} + T_{\text{test}}
-\label{eq:error_detection_time}
-\end{equation}
-
-При автоматическом CI $T_{\text{detection}} \ll T_{\text{manual\_testing}}$, что позволяет быстро находить и исправлять ошибки.
-
-\section{GitOps: проблема управления состоянием инфраструктуры}
-
-Традиционное управление инфраструктурой через ручные изменения приводит к дрейфу конфигурации и проблемам с воспроизводимостью. Проблема заключается в отсутствии версионирования и автоматического применения изменений.
-
-В основе GitOps лежит принцип декларативного описания желаемого состояния инфраструктуры \cite{weaveworks_gitops}. Желаемое состояние определяется через:
-
-\begin{equation}
-S_{\text{desired}} = f(\text{git\_state})
-\label{eq:desired_state}
-\end{equation}
-
-где $\text{git\_state}$ — состояние Git-репозитория.
-
-Текущее состояние инфраструктуры:
-
-\begin{equation}
-S_{\text{current}} = \text{read\_infrastructure}()
-\label{eq:current_state}
-\end{equation}
-
-Расхождение между желаемым и текущим состоянием:
-
-\begin{equation}
-\Delta S = S_{\text{desired}} - S_{\text{current}}
-\label{eq:state_drift}
-\end{equation}
-
-Автоматическое применение изменений:
-
-\begin{equation}
-\text{if } \Delta S \neq \emptyset \text{ then } S_{\text{current}} \leftarrow S_{\text{desired}}
-\label{eq:apply_changes}
-\end{equation}
-
-Вероятность успешного применения изменений:
-
-\begin{equation}
-P(\text{apply\_success}) = P(\text{validation}) \cdot P(\text{execution}) \cdot P(\text{verification})
-\label{eq:apply_success}
-\end{equation}
-
-где $P(\text{validation})$ — вероятность успешной валидации, $P(\text{execution})$ — вероятность успешного выполнения, $P(\text{verification})$ — вероятность успешной верификации.
-
-Откат изменений через Git revert:
-
-\begin{equation}
-S_{\text{desired}}' = \text{revert}(S_{\text{desired}}, \text{commit})
-\label{eq:git_revert}
-\end{equation}
-
-\begin{lstlisting}[caption={Пример конфигурации Kubernetes Deployment в Terraform}, label=lst:kubernetes_deployment, escapeinside={(*@}{@*)}]
-resource "kubernetes_deployment" "app" {
-  metadata {
-    name = "my-app"
-  }
-  spec {
-    replicas = 3
-    template {
-      spec {
-        container {
-          name  = "app"
-          image = "my-app:latest"
-        }
-      }
-    }
-  }
-}
-\end{lstlisting}
-
-\section{Kubernetes Self-Healing: проблема автоматического восстановления}
-
-Kubernetes обеспечивает самовосстановление через механизмы health checks и автоматического перезапуска \cite{burns_kubernetes,kubernetes_self_healing,kubernetes_docs}. Проблема заключается в определении критериев работоспособности и стратегии восстановления.
-
-Вероятность успешного health check зависит от нескольких факторов:
-
-\begin{align}
-P(\text{health\_check\_success})
-  &= P(\text{service\_running}) \cdot P(\text{endpoint\_responsive}) \nonumber \\
-  &\quad \cdot P(\text{dependencies\_ok})
-\label{eq:health_check}
-\end{align}
-
-Liveness probe проверяет работоспособность контейнера \cite{container_orchestration}:
-
-\begin{equation}
-\text{Liveness}(t) = \begin{cases}
-\text{true} & \text{если } \text{probe}(t) = \text{success} \\
-\text{false} & \text{иначе}
-\end{cases}
+\text{Liveness}(t) = \mathbf{1}[\text{probe}(t) = \text{success}]
 \label{eq:liveness_probe}
 \end{equation}
 
-Readiness probe проверяет готовность принимать трафик:
-
+ReplicaSet поддерживает заданное количество реплик $N_{\text{desired}}$. Доступность системы с $N$ идентичными репликами:
 \begin{equation}
-\text{Readiness}(t) = \begin{cases}
-\text{true} & \text{если } \text{probe}(t) = \text{success} \land \text{warmup\_complete}(t) \\
-\text{false} & \text{иначе}
-\end{cases}
-\label{eq:readiness_probe}
-\end{equation}
-
-Автоматический перезапуск при сбое:
-
-\begin{equation}
-\text{if } \text{Liveness}(t) = \text{false} \text{ for } T > T_{\text{threshold}} \text{ then } \text{restart}()
-\label{eq:auto_restart}
-\end{equation}
-
-Механизм ReplicaSet обеспечивает поддержание заданного количества реплик. Пусть желаемое количество реплик равно $N_{\text{desired}}$.
-
-Текущее количество работающих реплик: $N_{\text{current}}$.
-
-Расхождение:
-
-\begin{equation}
-\Delta N = N_{\text{desired}} - N_{\text{current}}
-\label{eq:replica_drift}
-\end{equation}
-
-Автоматическое масштабирование:
-
-\begin{equation}
-\text{if } \Delta N > 0 \text{ then } \text{create}(\Delta N) \text{ else if } \Delta N < 0 \text{ then } \text{delete}(|\Delta N|)
-\label{eq:replica_scaling}
-\end{equation}
-
-Вероятность доступности системы с $N$ репликами:
-
-\begin{equation}
-A(N) = 1 - \prod_{i=1}^{N} (1 - A_i)
+A(N) = 1 - (1 - A_{\text{single}})^N
 \label{eq:replica_availability}
 \end{equation}
 
-где $A_i$ — доступность реплики $i$.
+Rolling Update обновляет реплики поэтапно с условием безопасности $N_{\text{old}} + N_{\text{new}} \geq N_{\text{min}}$.
 
-Для идентичных реплик с доступностью $A$:
+\textbf{Ограничения Kubernetes self-healing.} Встроенные механизмы реагируют только на бинарные состояния (контейнер жив/мёртв, готов/не готов). Они не могут:
+\begin{itemize}
+    \item диагностировать корневую причину деградации производительности;
+    \item учитывать контекст (каскадный отказ, плановый деплой, утечка памяти);
+    \item принимать решения на уровне бизнес-логики (переключение circuit breaker, изменение конфигурации).
+\end{itemize}
 
-\begin{equation}
-A(N) = 1 - (1 - A)^N
-\label{eq:replica_availability_identical}
-\end{equation}
+Проектируемая система расширяет этот слой через Kubernetes API: агент Safe Executor использует \texttt{kubectl scale} для горизонтального масштабирования и \texttt{kubectl rollout undo} для отката деплоев (глава~8, глава~10). В отличие от встроенных механизмов, агент принимает решения на основе контекста --- причинно-следственного графа инцидента, а не отдельных проб.
 
-При стратегии Rolling Update обновление происходит постепенно без простоя. На каждом шаге обновляется $k$ реплик:
+\section{Стратегии развёртывания}
 
-\begin{equation}
-N_{\text{old}}' = N_{\text{old}} - k, \quad N_{\text{new}}' = N_{\text{new}} + k
-\label{eq:rolling_update}
-\end{equation}
+Выбор стратегии развёртывания влияет на риски инцидентов, которые должна обрабатывать система агентов \cite{chaos_engineering,netflix_chaos}.
 
-Условие безопасности обновления:
-
-\begin{equation}
-N_{\text{old}} + N_{\text{new}} \geq N_{\text{min}}
-\label{eq:rolling_safety}
-\end{equation}
-
-где $N_{\text{min}}$ — минимальное количество реплик для обеспечения доступности.
-
-Время обновления:
-
-\begin{equation}
-T_{\text{update}} = \left\lceil \frac{N_{\text{total}}}{k} \right\rceil \cdot (T_{\text{deploy}} + T_{\text{verify}})
-\label{eq:update_time}
-\end{equation}
-
-\section{Стратегии развёртывания: проблема минимизации рисков}
-
-Развёртывание новой версии несёт риски ошибок и простоя \cite{chaos_engineering,netflix_chaos}. Проблема заключается в выборе стратегии, минимизирующей риски при сохранении скорости развёртывания.
-
-В стратегии Blue-Green deployment используются две идентичные среды: Blue (текущая) и Green (новая версия). Это позволяет протестировать новую версию перед переключением трафика.
-
-Вероятность ошибки в новой версии: $p_{\text{error}}$.
-
-Ожидаемый ущерб при ошибке:
-
-\begin{equation}
-E[\text{damage}] = p_{\text{error}} \cdot \text{Cost}(\text{failure})
-\label{eq:expected_damage}
-\end{equation}
-
-При Blue-Green развёртывании ущерб ограничен только тестированием на Green:
-
+\textbf{Blue-Green deployment} использует две среды. Ожидаемый ущерб ограничен тестированием:
 \begin{equation}
 E[\text{damage}_{\text{BG}}] = p_{\text{error}} \cdot \text{Cost}(\text{test\_failure}) \ll \text{Cost}(\text{production\_failure})
 \label{eq:bg_damage}
 \end{equation}
 
-Время переключения:
-
-\begin{equation}
-T_{\text{switch}} = T_{\text{verification}} + T_{\text{traffic\_migration}}
-\label{eq:switch_time}
-\end{equation}
-
-Стратегия Canary deployment предполагает постепенное развёртывание новой версии на часть трафика. Пусть доля трафика на новую версию составляет $\alpha \in [0, 1]$.
-
-Количество запросов к новой версии:
-
-\begin{equation}
-N_{\text{canary}} = \alpha \cdot N_{\text{total}}
-\label{eq:canary_requests}
-\end{equation}
-
-Ожидаемое количество ошибок:
-
-\begin{equation}
-E[\text{errors}] = p_{\text{error}} \cdot N_{\text{canary}} = p_{\text{error}} \cdot \alpha \cdot N_{\text{total}}
-\label{eq:canary_errors}
-\end{equation}
-
-Критерий успешности canary:
-
+\textbf{Canary deployment} направляет долю $\alpha$ трафика на новую версию. Критерий успешности:
 \begin{equation}
 \text{SuccessRate}_{\text{canary}} > \text{SuccessRate}_{\text{baseline}} - \epsilon
 \label{eq:canary_success}
 \end{equation}
 
-где $\epsilon$ — допустимое снижение успешности.
+При выполнении условия $\alpha$ постепенно увеличивается до~1. В сценарии~4 прототипа (глава~10) агенты автоматически детектируют ухудшение метрик после деплоя и инициируют откат, что фактически реализует автоматический canary analysis.
 
-Если условие выполняется, увеличиваем долю трафика:
+\section{SRE: SLO, SLI и Error Budget}
 
+Ключевой инструмент SRE --- Service Level Objective (SLO) \cite{google_sre_book}:
 \begin{equation}
-\alpha' = \min(1, \alpha + \Delta \alpha)
-\label{eq:canary_expansion}
-\end{equation}
-
-где $\Delta \alpha$ — шаг увеличения доли.
-
-\section{SRE: проблема баланса между инновациями и стабильностью}
-
-SRE решает проблему баланса между скоростью разработки новых функций и стабильностью системы \cite{google_sre_book,sre_principles}. Проблема заключается в определении допустимого уровня ошибок.
-
-Ключевым инструментом SRE является Service Level Objective (SLO), который определяет целевой уровень качества обслуживания:
-
-\begin{equation}
-\text{SLO} = P(\text{metric} \leq \text{threshold})
+\text{SLO}_{\text{availability}} = P(\text{uptime} \geq 99.9\%) = 0.999
 \label{eq:slo}
 \end{equation}
 
-Например, для доступности:
-
+Error Budget определяет допустимый объём ошибок:
 \begin{equation}
-\text{SLO}_{\text{availability}} = P(\text{uptime} \geq 99.9\%) = 0.999
-\label{eq:slo_availability}
-\end{equation}
-
-Error Budget (бюджет ошибок):
-
-\begin{equation}
-\text{Error Budget} = 1 - \text{SLO}
+\text{Error Budget} = 1 - \text{SLO}, \quad \text{Budget Used} = \frac{\text{MTTR} \cdot N_{\text{incidents}}}{T_{\text{period}}}
 \label{eq:error_budget}
 \end{equation}
 
-Для SLO = 99.9\%:
+При $\text{Budget Used} > \text{Error Budget}$ релизы замораживаются до восстановления бюджета.
 
+Service Level Indicator (SLI) измеряет фактический уровень обслуживания:
 \begin{equation}
-\text{Error Budget} = 0.1\% = \frac{43.2 \text{ минут}}{месяц}
-\label{eq:error_budget_calculation}
-\end{equation}
-
-Использование error budget:
-
-\begin{equation}
-\text{Budget Used} = \frac{T_{\text{downtime}}}{T_{\text{period}}} = \frac{\text{MTTR} \cdot N_{\text{incidents}}}{T_{\text{period}}}
-\label{eq:budget_usage}
-\end{equation}
-
-Критерий превышения бюджета:
-
-\begin{equation}
-\text{Budget Used} > \text{Error Budget} \Rightarrow \text{freeze releases}
-\label{eq:budget_exceeded}
-\end{equation}
-
-Service Level Indicator (SLI) измеряет фактический уровень качества обслуживания:
-
-\begin{equation}
-\text{SLI} = \frac{\text{good requests}}{\text{total requests}} = \frac{N_{\text{good}}}{N_{\text{total}}}
+\text{SLI} = \frac{N_{\text{good}}}{N_{\text{total}}}
 \label{eq:sli}
 \end{equation}
 
-Соответствие SLO:
+\textbf{Связь с агентами.} SLO и error budget задают внешние ограничения для Safe Executor: действия восстановления должны не только снижать MTTR конкретного инцидента, но и обеспечивать соблюдение SLO. Конкретный пример: при текущем $\text{SLI} = 99.92\%$ и $\text{SLO} = 99.9\%$ оставшийся error budget составляет $0.02\%$ --- агент переключается на консервативную стратегию, повышая порог $\theta_{\text{risk}}$ (формула \ref{eq:safety_criterion}) и допуская только действия с минимальным риском (перезапуск пода, увеличение реплик), блокируя рискованные операции (изменение конфигурации, откат деплоя).
 
-\begin{equation}
-\text{SLO Met} = \begin{cases}
-\text{true} & \text{если } \text{SLI} \geq \text{SLO} \\
-\text{false} & \text{иначе}
-\end{cases}
-\label{eq:slo_met}
-\end{equation}
+\medskip
 
-\section{Ограничения Prometheus: проблема масштабирования pull-модели}
-
-Prometheus использует pull-модель для сбора метрик \cite{prometheus_paper,prometheus_docs}. Проблема заключается в ограничениях масштабирования при росте количества источников метрик.
-
-В pull-модели время сбора метрик от $N$ источников определяется следующим образом:
-
-\begin{equation}
-T_{\text{collection}} = \sum_{i=1}^{N} (T_{\text{poll},i} + T_{\text{network},i})
-\label{eq:prometheus_collection}
-\end{equation}
-
-При одинаковых источниках:
-
-\begin{equation}
-T_{\text{collection}} = N \cdot (T_{\text{poll}} + T_{\text{network}})
-\label{eq:prometheus_collection_uniform}
-\end{equation}
-
-Проблема: при $N \to \infty$ время сбора растёт линейно.
-
-Ограничение по объёму данных:
-
-\begin{equation}
-V(t) = V_0 \cdot e^{\lambda t}
-\label{eq:storage_growth}
-\end{equation}
-
-где $V_0$ — начальный объём, $\lambda$ — скорость роста данных.
-
-Решение через downsampling:
-
-\begin{equation}
-V_{\text{downsampled}}(t) = V(t) \cdot \frac{1}{k}
-\label{eq:downsampling}
-\end{equation}
-
-где $k$ — коэффициент понижения частоты дискретизации.
-
-Потеря точности при downsampling:
-
-\begin{equation}
-\text{Error}_{\text{downsampling}} = \frac{1}{k} \sum_{i=1}^{k} |x_i - \bar{x}|
-\label{eq:downsampling_error}
-\end{equation}
-
-где $\bar{x} = \frac{1}{k} \sum_{i=1}^{k} x_i$ — среднее значение в интервале.
-
-Количественные характеристики DevOps- и SRE-практик связывают организацию поставки изменений с эксплуатационными метриками систем. Декомпозиция времени доставки \(T_{\text{delivery}}\), модели успешности сборок и непрерывная интеграция ограничивают частоту релизов при заданном уровне риска, а GitOps-формализация желаемого и фактического состояний описывает конфигурационный дрейф и его устранение.
-
-Механизмы самовосстановления в Kubernetes, стратегии развёртывания (Blue-Green, Canary), а также SLO/SLI и error budget связывают целевые показатели надёжности с параметрами управляемых процессов: числом реплик, шагами обновления, долей неуспешных запросов и бюджетом простоя. Модели роста объёма метрик и downsampling определяют допустимые режимы мониторинга при масштабировании.
-
-Далее эти зависимости используются как внешние ограничения для автономных агентов: решения по восстановлению и изменению конфигурации должны находиться внутри области, заданной SLO и бюджетом ошибок, а GitOps и Kubernetes-self-healing служат инфраструктурным слоем для выполнения действий агентов.
+DevOps/SRE-практики формируют инфраструктурный контекст для автономных агентов: GitOps обеспечивает слой выполнения действий с гарантированным откатом, Kubernetes self-healing --- базовый уровень восстановления, стратегии развёртывания определяют сценарии инцидентов, а SLO/error budget задают количественные ограничения на безопасность решений.

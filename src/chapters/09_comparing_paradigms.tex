@@ -1,416 +1,114 @@
-\chapter{Сравнение инженерных парадигм}
+\chapter{Обоснование архитектурных решений}
 
-\section{Монолит vs Микросервисы: проблема масштабирования}
+Проектируемая система требует выбора из нескольких альтернатив по каждому архитектурному измерению: декомпозиция, модель сбора данных, стиль взаимодействия компонентов, подход к диагностике. Данная глава формализует критерии выбора и обосновывает принятые решения.
 
-Монолитная архитектура проста в разработке, но ограничена в масштабировании \cite{newman_microservices}. Микросервисная архитектура поддерживает горизонтальное масштабирование, но повышает сложность управления и оркестрации \cite{richardson_microservices_patterns,ieee_microservices}.
+\section{Сводка архитектурных альтернатив}
 
-В монолитной архитектуре система представляет собой единое целое: $S_{\text{monolith}} = \{C_1, C_2, \ldots, C_n\}$, где $C_i$ — компоненты.
+Каждое архитектурное измерение представляет компромисс между конкурирующими свойствами. Таблица~\ref{tab:architecture_decisions} фиксирует выбор для проектируемой системы с указанием определяющих критериев.
 
-Связанность компонентов:
-
-\begin{equation}
-\text{Coupling}_{\text{monolith}} = \frac{|\text{internal\_dependencies}|}{n(n-1)/2} \approx 1
-\label{eq:monolith_coupling}
-\end{equation}
-
-Пропускная способность ограничена производительностью одного узла:
-
-\begin{equation}
-\text{Throughput}_{\text{monolith}} = \min(\text{CPU}, \text{Memory}, \text{Network})
-\label{eq:monolith_throughput}
-\end{equation}
-
-Масштабирование возможно только вертикально:
-
-\begin{equation}
-\text{Throughput}_{\text{scaled}} = k \cdot \text{Throughput}_{\text{monolith}}, \quad k \in [1, K_{\max}]
-\label{eq:monolith_scaling}
-\end{equation}
-
-где $K_{\max}$ — ограничение вертикального масштабирования.
-
-В микросервисной архитектуре система представляет собой множество независимых сервисов: $S_{\text{microservices}} = \{s_1, s_2, \ldots, s_m\}$.
-
-Связанность сервисов:
-
-\begin{equation}
-\text{Coupling}_{\text{microservices}} = \frac{|\text{inter-service\_dependencies}|}{m(m-1)/2} \ll 1
-\label{eq:microservices_coupling}
-\end{equation}
-
-Пропускная способность определяется узким местом:
-
-\begin{equation}
-\text{Throughput}_{\text{microservices}} = \min_{i=1}^{m} \text{Throughput}(s_i)
-\label{eq:microservices_throughput}
-\end{equation}
-
-Горизонтальное масштабирование каждого сервиса независимо:
-
-\begin{equation}
-\text{Throughput}_{\text{scaled}} = \min_{i=1}^{m} k_i \cdot \text{Throughput}(s_i)
-\label{eq:microservices_scaling}
-\end{equation}
-
-где $k_i$ — коэффициент масштабирования сервиса $s_i$.
-
-Сравнение через метрику эффективности:
-
-\begin{equation}
-\text{Efficiency} = \frac{\text{Throughput}}{\text{Complexity}}
-\label{eq:efficiency_metric}
-\end{equation}
-
-Для монолита сложность низкая: $\text{Complexity}_{\text{monolith}} = O(1)$.
-
-Для микросервисов сложность высокая: $\text{Complexity}_{\text{microservices}} = O(m \cdot \log m)$ (управление оркестрацией).
-
-Выбор архитектуры:
-
-\begin{equation}
-\text{Architecture} = \begin{cases}
-\text{Monolith} & \text{если } \text{Throughput}_{\text{required}} < \text{Throughput}_{\text{monolith,max}} \\
-\text{Microservices} & \text{иначе}
-\end{cases}
-\label{eq:architecture_choice}
-\end{equation}
-
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\begin{tikzpicture}[node distance=1.5cm]
-    \node[rectangle, draw, fill=blue!20, minimum width=4cm, minimum height=2cm] (monolith) {Monolith};
-    \node[rectangle, draw, fill=green!20, minimum width=1.5cm, minimum height=1cm, right=3cm of monolith] (ms1) {Service 1};
-    \node[rectangle, draw, fill=green!20, minimum width=1.5cm, minimum height=1cm, above=of ms1] (ms2) {Service 2};
-    \node[rectangle, draw, fill=green!20, minimum width=1.5cm, minimum height=1cm, below=of ms1] (ms3) {Service 3};
-    
-    \draw[->] (ms1) -- (ms2);
-    \draw[->] (ms1) -- (ms3);
-\end{tikzpicture}
-\caption{Архитектурное сравнение монолита и микросервисов \cite{newman_microservices,richardson_microservices_patterns}}
-\label{fig:monolith_microservices}
-\end{figure}
+\caption{Архитектурные решения проектируемой системы}
+\label{tab:architecture_decisions}
+\small
+\begin{tabular}{|p{2.2cm}|p{2cm}|p{2cm}|p{4.5cm}|}
+\hline
+\textbf{Измерение} & \textbf{Альтернативы} & \textbf{Выбор} & \textbf{Обоснование} \\
+\hline
+Декомпозиция & Монолит, микросервисы & Микросервисы & Независимое масштабирование Anomaly Detector и LLM Agent; изоляция отказов между модулями \\
+\hline
+Сбор данных & Push, pull, гибрид & Push (Kafka) & Задержка push-модели $T_{\text{push}} = T_{\text{send}} + T_{\text{net}}$ ниже, чем pull: $T_{\text{pull}} = T_{\text{poll}}/2 + T_{\text{net}}$; для LSTM-детектора критична минимальная задержка доставки \\
+\hline
+Взаимодействие & Request-driven, event-driven & Event-driven & Слабая связанность через шину событий; отказ одного агента не блокирует остальных (глава~2, формула~(\ref{eq:cascade_failure})) \\
+\hline
+Диагностика & Rule-based, ML-based, гибрид & Гибрид & Баланс интерпретируемости и адаптивности (секция~\ref{sec:rule_vs_ml}) \\
+\hline
+\end{tabular}
+\end{table}
 
-\section{Push vs Pull модели: проблема инициативы сбора данных}
+\textbf{Микросервисная декомпозиция} выбрана не для целевой системы (которая и так является распределённой), а для самих агентов диагностики. Связанность модулей $\text{Coupling} = 0.24$ (глава~8) означает, что LSTM Anomaly Detector, Diagnostic Engine и LLM Agent могут масштабироваться и обновляться независимо. Это критично: инференс LLM требует GPU и горизонтально масштабируется иначе, чем CPU-bound Diagnostic Engine.
 
-Push-модель инициируется источником данных, pull-модель — сборщиком. Проблема заключается в выборе оптимальной модели для конкретного сценария.
+\textbf{Event-driven взаимодействие через Kafka} обеспечивает два преимущества. Во-первых, буферизация: при всплеске алертов события накапливаются в топике, а не теряются. Во-вторых, воспроизводимость: при расследовании инцидента можно переиграть поток событий. В прототипе (глава~10) Kafka используется как единая шина для метрик, логов и трейсов с корреляцией по \texttt{trace\_id}.
 
-В push-модели источник данных отправляет данные с интенсивностью $\lambda_{\text{push}}$.
+\section{Rule-based vs ML-based диагностика}
+\label{sec:rule_vs_ml}
 
-Время доставки данных:
-
+Rule-based диагностика использует набор правил $\mathcal{R} = \{r_1, \ldots, r_k\}$ вида <<если условие, то диагноз>>. Применение правила:
 \begin{equation}
-T_{\text{push}} = T_{\text{send}} + T_{\text{network}}
-\label{eq:push_time}
+\text{Action} = \text{action}_j, \quad j = \arg\min_{i: \text{condition}_i(s) = \text{true}} \text{priority}(r_i)
+\label{eq:rule_application_paradigm}
 \end{equation}
 
-Проблема: при сбое источника данные теряются, так как сборщик не знает о существовании источника.
-
-Надёжность push-модели:
-
-\begin{equation}
-R_{\text{push}} = P(\text{source\_alive}) \cdot P(\text{network\_ok})
-\label{eq:push_reliability}
-\end{equation}
-
-В pull-модели сборщик опрашивает источники с периодом $T_{\text{poll}}$.
-
-Время получения данных:
-
-\begin{equation}
-T_{\text{pull}} = T_{\text{poll}} + T_{\text{network}} + T_{\text{response}}
-\label{eq:pull_time}
-\end{equation}
-
-Проблема: задержка до $T_{\text{poll}}$ перед получением данных.
-
-Надёжность pull-модели:
-
-\begin{equation}
-R_{\text{pull}} = P(\text{collector\_alive}) \cdot P(\text{network\_ok})
-\label{eq:pull_reliability}
-\end{equation}
-
-Преимущество: сборщик контролирует процесс сбора, что обеспечивает устойчивость к сбоям источников.
-
-Сравнение через метрику задержки:
-
-\begin{equation}
-\text{Latency}_{\text{push}} = T_{\text{send}} + T_{\text{network}}
-\label{eq:push_latency}
-\end{equation}
-
-\begin{equation}
-\text{Latency}_{\text{pull}} = \frac{T_{\text{poll}}}{2} + T_{\text{network}} + T_{\text{response}}
-\label{eq:pull_latency}
-\end{equation}
-
-где $\frac{T_{\text{poll}}}{2}$ — средняя задержка ожидания следующего опроса.
-
-Выбор модели:
-
-\begin{equation}
-\text{Model} = \begin{cases}
-\text{Push} & \text{если } \text{Latency}_{\text{required}} < T_{\text{poll}}/2 \land \text{short\_lived} \\
-\text{Pull} & \text{если } \text{long\_term} \land \text{reliability\_critical}
-\end{cases}
-\label{eq:model_choice}
-\end{equation}
-
-\section{Event vs Request-Driven: проблема связности компонентов}
-
-Request-driven архитектура создаёт сильную связность между компонентами через явные вызовы. Event-driven архитектура обеспечивает слабую связность через события.
-
-В request-driven архитектуре граф вызовов представляется как $G_{\text{request}} = (V, E)$, где $V$ — сервисы, $E$ — вызовы.
-
-Связанность:
-
-\begin{equation}
-\text{Coupling}_{\text{request}} = \frac{|E|}{|V|(|V|-1)/2}
-\label{eq:request_coupling}
-\end{equation}
-
-Задержка цепочки вызовов:
-
-\begin{equation}
-T_{\text{chain}} = \sum_{i=1}^{n} (T_{\text{request},i} + T_{\text{process},i} + T_{\text{response},i})
-\label{eq:request_chain_latency}
-\end{equation}
-
-Проблема: отказ одного сервиса блокирует всю цепочку.
-
-В event-driven архитектуре граф событий представляется как $G_{\text{event}} = (V, E)$, где $V$ — сервисы, $E$ — события.
-
-Связанность через шину событий:
-
-\begin{equation}
-\text{Coupling}_{\text{event}} = \frac{1}{|V|} \ll \text{Coupling}_{\text{request}}
-\label{eq:event_coupling}
-\end{equation}
-
-Задержка обработки события:
-
-\begin{equation}
-T_{\text{event}} = T_{\text{publish}} + T_{\text{queue}} + T_{\text{process}} + T_{\text{consume}}
-\label{eq:event_latency}
-\end{equation}
-
-Преимущество: сервисы независимы, отказ одного не блокирует другие.
-
-Пропускная способность event-driven системы:
-
-\begin{equation}
-\text{Throughput}_{\text{event}} = \min(\lambda_{\text{publish}}, \mu_{\text{process}}, \lambda_{\text{consume}})
-\label{eq:event_throughput}
-\end{equation}
-
-где $\lambda_{\text{publish}}$ — интенсивность публикации событий, $\mu_{\text{process}}$ — интенсивность обработки, $\lambda_{\text{consume}}$ — интенсивность потребления.
-
-Сравнение через метрику отказоустойчивости:
-
-\begin{equation}
-\text{Resilience}_{\text{request}} = \prod_{i=1}^{n} R_i
-\label{eq:request_resilience}
-\end{equation}
-
-где $R_i$ — надёжность сервиса $i$ в цепочке.
-
-\begin{equation}
-\text{Resilience}_{\text{event}} = 1 - \prod_{i=1}^{n} (1 - R_i)
-\label{eq:event_resilience}
-\end{equation}
-
-Для идентичных сервисов с надёжностью $R$:
-
-\begin{equation}
-\text{Resilience}_{\text{request}} = R^n, \quad \text{Resilience}_{\text{event}} = 1 - (1-R)^n
-\label{eq:resilience_comparison}
-\end{equation}
-
-При $R < 1$ и $n > 1$: $\text{Resilience}_{\text{event}} > \text{Resilience}_{\text{request}}$.
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[node distance=2cm]
-    \node[circle, draw, fill=blue!20] (event) {Event Bus};
-    \node[rectangle, draw, fill=green!20, above left=of event] (s1) {Service 1};
-    \node[rectangle, draw, fill=green!20, above right=of event] (s2) {Service 2};
-    \node[rectangle, draw, fill=green!20, below=of event] (s3) {Service 3};
-    
-    \draw[->] (s1) -- (event);
-    \draw[->] (s2) -- (event);
-    \draw[->] (event) -- (s3);
-\end{tikzpicture}
-\caption{Event-driven архитектура с шиной событий \cite{richardson_microservices_patterns,hohpe_enterprise_integration}}
-\label{fig:event_driven}
-\end{figure}
-
-\section{React vs Actor модель: проблема управления состоянием}
-
-React модель использует разделяемое состояние и асинхронную обработку. Actor модель изолирует состояние в акторах. Проблема заключается в выборе модели для параллельной обработки.
-
-В React модели состояние системы представляется как $S = \{s_1, s_2, \ldots, s_n\}$.
-
-Асинхронные обработчики событий: $\mathcal{H} = \{h_1, h_2, \ldots, h_m\}$.
-
-Обработчик $h_i$ обновляет состояние:
-
-\begin{equation}
-s_j' = h_i(s_j, \text{event})
-\label{eq:react_update}
-\end{equation}
-
-Проблема гонок данных (race conditions):
-
-\begin{equation}
-P(\text{race\_condition}) = P(\text{concurrent\_access}) \cdot P(\text{non-atomic\_update})
-\label{eq:race_probability}
-\end{equation}
-
-В Actor модели каждый актор $A_i$ имеет изолированное состояние $s_i$ и очередь сообщений $Q_i$.
-
-Обработка сообщения:
-
-\begin{equation}
-(s_i', \text{responses}) = A_i.\text{receive}(s_i, \text{message})
-\label{eq:actor_receive}
-\end{equation}
-
-Изоляция состояния:
-
-\begin{equation}
-\forall i \neq j: s_i \cap s_j = \emptyset
-\label{eq:actor_isolation}
-\end{equation}
-
-Преимущество: отсутствие гонок данных из-за изоляции.
-
-Пропускная способность React модели:
-
-\begin{equation}
-\text{Throughput}_{\text{react}} = \frac{N_{\text{events}}}{T_{\text{processing}}}
-\label{eq:react_throughput}
-\end{equation}
-
-Пропускная способность Actor модели:
-
-\begin{equation}
-\text{Throughput}_{\text{actor}} = \sum_{i=1}^{n} \frac{N_{\text{messages},i}}{T_{\text{processing},i}}
-\label{eq:actor_throughput}
-\end{equation}
-
-Сравнение через метрику масштабируемости:
-
-Вертикальное масштабирование React:
-
-\begin{equation}
-\text{Throughput}_{\text{react,scaled}} = k \cdot \text{Throughput}_{\text{react}}, \quad k \in [1, K_{\max}]
-\label{eq:react_scaling}
-\end{equation}
-
-Горизонтальное масштабирование Actor:
-
-\begin{equation}
-\text{Throughput}_{\text{actor,scaled}} = \sum_{i=1}^{k \cdot n} \text{Throughput}(A_i)
-\label{eq:actor_scaling}
-\end{equation}
-
-где $k$ — коэффициент масштабирования.
-
-\section{Rule-based vs ML-based диагностика: проблема адаптивности}
-
-Rule-based диагностика прозрачна, но не адаптируется к изменениям. ML-based диагностика адаптивна, но менее интерпретируема.
-
-В rule-based диагностике используется набор правил: $\mathcal{R} = \{r_1, r_2, \ldots, r_k\}$.
-
-Правило $r_i$: $\text{if } \text{condition}_i(s) \text{ then } \text{diagnosis}_i$.
-
-Точность диагностики:
-
-\begin{equation}
-\text{Accuracy}_{\text{rule}} = \frac{|\text{correct\_diagnoses}|}{|\text{total\_diagnoses}|}
-\label{eq:rule_accuracy}
-\end{equation}
-
-Проблема: правила статичны и не адаптируются к изменениям в системе.
-
-Время настройки правил:
-
-\begin{equation}
-T_{\text{setup,rule}} = \sum_{i=1}^{k} T_{\text{rule\_creation},i}
-\label{eq:rule_setup_time}
-\end{equation}
-
-В ML-based диагностике модель $M: \mathcal{S} \to \mathcal{D}$ отображает состояние системы в пространство диагнозов $\mathcal{D}$.
-
-Обучение модели:
-
+ML-based диагностика обучает модель $M: \mathcal{S} \to \mathcal{D}$ на исторических данных:
 \begin{equation}
 M^* = \arg\min_{M} \sum_{(s, d) \in \mathcal{D}_{\text{train}}} L(M(s), d)
-\label{eq:ml_training}
+\label{eq:ml_training_paradigm}
 \end{equation}
 
-где $L$ — функция потерь, $\mathcal{D}_{\text{train}}$ — обучающая выборка.
-
-Точность диагностики:
-
-\begin{equation}
-\text{Accuracy}_{\text{ml}} = \frac{|\{(s, d) : M(s) = d\}|}{|\mathcal{D}_{\text{test}}|}
-\label{eq:ml_accuracy}
-\end{equation}
-
-Адаптация через переобучение:
-
-\begin{equation}
-M_{t+1} = \text{Retrain}(M_t, \mathcal{D}_{\text{new}})
-\label{eq:ml_retraining}
-\end{equation}
-
-где $\mathcal{D}_{\text{new}}$ — новые данные.
-
-Сравнение через метрику эффективности:
-
+Компромисс формализуется через соотношение точности и стоимости поддержки:
 \begin{equation}
 \text{Efficiency} = \frac{\text{Accuracy}}{\text{SetupTime} + \text{MaintenanceTime}}
-\label{eq:diagnosis_efficiency}
+\label{eq:diagnosis_efficiency_paradigm}
 \end{equation}
 
-Для rule-based: $\text{MaintenanceTime} = O(k)$ (линейно от количества правил).
+Для rule-based подхода $\text{MaintenanceTime} = O(k)$ --- линейно от числа правил; при добавлении новых сервисов требуется ручное написание правил. Для ML-based подхода $\text{MaintenanceTime} = O(|\mathcal{D}_{\text{new}}|)$ --- линейно от объёма новых данных; адаптация происходит автоматически через переобучение.
 
-Для ML-based: $\text{MaintenanceTime} = O(|\mathcal{D}_{\text{new}}|)$ (линейно от объёма новых данных).
+\begin{table}[H]
+\centering
+\caption{Сравнение подходов к диагностике}
+\label{tab:diagnosis_approaches}
+\small
+\begin{tabular}{|p{2.5cm}|p{2.2cm}|p{2.2cm}|p{2.2cm}|}
+\hline
+\textbf{Критерий} & \textbf{Rule-based} & \textbf{ML-based} & \textbf{Гибрид (выбор)} \\
+\hline
+Интерпретируемость & Высокая & Низкая & Высокая для типичных случаев \\
+\hline
+Адаптивность & Нет & Да & Да \\
+\hline
+Время реакции & $< 1$ мс & $10$--$100$ мс & $< 1$ мс (rule) или $10$--$100$ мс (ML) \\
+\hline
+Масштабируемость & $O(k)$ правил вручную & Автоматическая & Автоматическая + ручные правила для критичных случаев \\
+\hline
+\end{tabular}
+\end{table}
 
-Гибридный подход:
-
+Гибридный подход комбинирует оба метода:
 \begin{equation}
 \text{Diagnosis} = \begin{cases}
 \text{rule\_based}(s) & \text{если } \text{confidence}(\text{rule}) > \theta \\
 \text{ml\_based}(s) & \text{иначе}
 \end{cases}
-\label{eq:hybrid_diagnosis}
+\label{eq:hybrid_diagnosis_paradigm}
 \end{equation}
 
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[scale=0.8]
-\begin{axis}[
-    xlabel={Количество правил/обучений},
-    ylabel={Точность диагностики, \%},
-    title={Сравнение точности диагностики},
-    grid=major,
-    legend pos=south east,
-]
-\addplot[blue,thick] coordinates {
-    (10, 60) (20, 70) (30, 75) (40, 78) (50, 80)
-};
-\addplot[red,thick] coordinates {
-    (10, 65) (20, 80) (30, 88) (40, 91) (50, 92)
-};
-\legend{Rule-based, ML-based}
-\end{axis}
-\end{tikzpicture}
-\caption{Зависимость точности от сложности системы}
-\label{fig:accuracy_comparison}
-\end{figure}
+В проектируемой системе гибридный подход реализуется следующим образом:
+\begin{itemize}
+    \item \textbf{Rule-based уровень}: Z-score пороги (глава~6) для известных паттернов отказов --- OOM-kill ($\text{memory} > 90\%$), disk full, certificate expiry. Эти правила обеспечивают мгновенную реакцию ($< 1$ мс) и полную интерпретируемость.
+    \item \textbf{ML-based уровень}: LSTM Anomaly Detector (глава~6) для нетипичных паттернов --- каскадных отказов, медленной деградации, аномальных корреляций между метриками. Обнаруживает аномалии, которые невозможно описать статическими правилами.
+    \item \textbf{LLM-уровень}: анализ неструктурированных логов (главы~6, 7) для случаев, когда причина кроется в конфигурации или логике приложения, а не в перегрузке ресурсов.
+\end{itemize}
 
-Сопоставление инженерных парадигм в данной главе формализует пространство архитектурных решений, в котором далее проектируется и реализуется система интеллектуальных агентов. Соотношения между пропускной способностью, сложностью управления и отказоустойчивостью для монолита и микросервисов, push/pull-моделей, event- и request-driven архитектур, а также react и actor-моделей задают допустимые конфигурации базовой платформы.
+Ablation study (глава~11) подтверждает необходимость всех трёх уровней: отключение LSTM снижает $F_1$ на 17.9\%, LLM --- на 4.6\%. Из 11 инцидентов, разобранных в качественном анализе, LLM оказался критичен в 4 случаях (37\%), где числовые методы не могли определить корневую причину.
 
-Анализ rule-based и ML-based диагностики, дополненный гибридными схемами, определяет варианты организации диагностического контура по оси «интерпретируемость–адаптивность», а введённые метрики эффективности позволяют количественно сравнивать альтернативные решения. Для проектируемой системы интеллектуальных агентов это пространство решений сужается до комбинаций, обеспечивающих требуемые показатели задержки, надёжности и масштабируемости, что используется в последующих главах при описании прототипа и экспериментальной установки.
+\section{Обоснование выбора event-driven архитектуры}
+
+Отказоустойчивость event-driven архитектуры формализуется через сравнение с request-driven моделью. Для $n$ последовательных сервисов в request-driven цепочке:
+\begin{equation}
+R_{\text{request}} = \prod_{i=1}^{n} R_i = R^n
+\label{eq:request_resilience_paradigm}
+\end{equation}
+
+В event-driven архитектуре с независимой обработкой:
+\begin{equation}
+R_{\text{event}} = 1 - \prod_{i=1}^{n}(1 - R_i) = 1 - (1 - R)^n
+\label{eq:event_resilience_paradigm}
+\end{equation}
+
+При $R = 0.99$ и $n = 5$: $R_{\text{request}} = 0.951$, $R_{\text{event}} = 0.99999$. Для системы диагностики, где ложное молчание (пропуск аномалии) критичнее ложной тревоги, event-driven архитектура предпочтительна.
+
+В прототипе (глава~10) это реализуется через Apache Kafka: каждый модуль (Anomaly Detector, Diagnostic Engine, LLM Agent) потребляет события из выделенных топиков и публикует результаты в downstream-топики. Отказ LLM Agent не останавливает работу Anomaly Detector --- диагностика продолжается без LLM-обогащения, с автоматическим восстановлением при возвращении модуля.
+
+\medskip
+
+Архитектурные решения --- микросервисная декомпозиция агентов, event-driven взаимодействие через Kafka, гибридная диагностика (rule + ML + LLM) --- определены требованиями к отказоустойчивости, задержке и адаптивности. Каждый выбор обоснован формальными критериями и верифицирован экспериментально (глава~11). Конкретная реализация этих решений описана в архитектуре системы (глава~8) и прототипе (глава~10).
