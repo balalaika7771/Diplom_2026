@@ -12,7 +12,7 @@ BUILD_DIR = build
 LATEX_FLAGS = -shell-escape -interaction=nonstopmode -file-line-error -halt-on-error
 
 # Цели по умолчанию
-.PHONY: all clean view help quick copy-sources
+.PHONY: all pdf clean view help quick copy-sources docx
 
 # Зависимости для копирования
 SRC_DIRS = src config
@@ -21,8 +21,11 @@ SRC_DIRS = src config
 CHAPTER_TEX := $(wildcard src/chapters/*.tex)
 APPENDIX_TEX := $(wildcard src/appendix/*.tex)
 
-# Компиляция документа в папку build
-all: $(BUILD_DIR)/$(MAIN).pdf
+# Полная сборка: PDF + DOCX
+all: pdf docx
+
+# Компиляция только PDF
+pdf: $(BUILD_DIR)/$(MAIN).pdf
 
 # Копирование источников (только если изменились)
 copy-sources:
@@ -115,6 +118,11 @@ quick: generate-lists
 		exit 1; \
 	fi
 
+# Конвертация в DOCX (требует pandoc и python3)
+docx: generate-lists
+	@echo "Конвертация LaTeX → DOCX..."
+	@bash scripts/tex2docx.sh
+
 # Просмотр PDF
 view: $(BUILD_DIR)/$(MAIN).pdf
 	@$(VIEWER) $(BUILD_DIR)/$(MAIN).pdf
@@ -151,8 +159,10 @@ warnings:
 # Справка
 help:
 	@echo "Доступные команды:"
-	@echo "  make          - Полная компиляция документа (3 прохода + библиография)"
-	@echo "  make quick    - Быстрая компиляция (1 проход, без библиографии)"
+	@echo "  make          - Полная сборка: PDF + DOCX"
+	@echo "  make pdf      - Только PDF (3 прохода + библиография)"
+	@echo "  make docx     - Только DOCX (LaTeX → pandoc → Word)"
+	@echo "  make quick    - Быстрая компиляция PDF (1 проход, без библиографии)"
 	@echo "  make view     - Открыть PDF файл"
 	@echo "  make clean    - Удалить папку build/ со всеми временными файлами"
 	@echo "  make distclean - Удалить все сгенерированные файлы"
@@ -160,4 +170,6 @@ help:
 	@echo "  make warnings - Показать предупреждения из последней сборки"
 	@echo "  make help     - Показать эту справку"
 	@echo ""
-	@echo "PDF будет создан в: $(BUILD_DIR)/$(MAIN).pdf"
+	@echo "Результаты:"
+	@echo "  PDF:  $(BUILD_DIR)/$(MAIN).pdf"
+	@echo "  DOCX: $(BUILD_DIR)/$(MAIN).docx"
