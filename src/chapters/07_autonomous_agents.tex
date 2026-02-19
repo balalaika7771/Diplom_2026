@@ -144,23 +144,23 @@ T_{\text{hybrid}} = \min(T_{\text{rule}}, T_{\text{ml}}) + P(\text{need\_llm}) \
 \caption{Сравнение существующих AIOps-решений с предлагаемым подходом}
 \label{tab:aiops_comparison}
 \small
-\begin{tabular}{|p{2.2cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.8cm}|p{1.8cm}|}
+\begin{tabularx}{\textwidth}{|p{2cm}|X|X|X|X|X|}
 \hline
 \textbf{Система} & \textbf{Обнару\-жение} & \textbf{Причинный анализ} & \textbf{Авто\-восстанов\-ление} & \textbf{LLM-ана\-лиз логов} & \textbf{Безопас\-ность действий} \\
 \hline
-Prometheus + Alertmanager & Пороговые правила & Нет & Нет & Нет & Нет \\
+Prometheus + Alert\-manager & Пороговые правила & Нет & Нет & Нет & Нет \\
 \hline
 Datadog Watchdog \cite{aiops_survey} & ML-ано\-малии & Частичный (корреляции) & Нет & Нет & Нет \\
 \hline
-Dynatrace Davis \cite{gartner_aiops} & ML + топология & Автомати\-ческий & Runbook-автома\-тизация & Нет & Частичная \\
+Dynatrace Davis \cite{gartner_aiops} & ML + топология & Автомати\-ческий & Runbook & Нет & Частичная \\
 \hline
-IBM Cloud Pak for AIOps \cite{gartner_aiops} & ML-ансамбль & Графовый & Runbook & Базовый NLP & Нет \\
+IBM Cloud Pak \cite{gartner_aiops} & ML-ансамбль & Графовый & Runbook & Базовый NLP & Нет \\
 \hline
 PagerDuty AIOps \cite{aiops_survey} & Статистика + ML & Корреляция алертов & Триггеры & Нет & Нет \\
 \hline
-\textbf{Предлага\-емая система} & \textbf{LSTM + ансамбль} & \textbf{Причинный граф + Грейнджер} & \textbf{Консенсус агентов} & \textbf{MCP + LLM} & \textbf{Safe Executor ($r_{\max}$)} \\
+\textbf{Предлага\-емая система} & \textbf{LSTM + ансамбль} & \textbf{Причинный граф} & \textbf{Консенсус агентов} & \textbf{MCP + LLM} & \textbf{Safe Executor} \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 Анализ существующих решений выявляет три ключевых пробела:

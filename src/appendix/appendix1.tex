@@ -4,35 +4,35 @@
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=1.5cm, auto, scale=0.8, transform shape, font=\small]
+\begin{tikzpicture}[node distance=1.2cm, auto, scale=0.65, transform shape, font=\small]
     % Observability stack
     \node[rectangle, draw, fill=blue!20, minimum width=1.8cm, minimum height=0.8cm] (prometheus) {Prometheus};
     \node[rectangle, draw, fill=blue!20, below=of prometheus, minimum width=1.8cm, minimum height=0.8cm] (es) {Elasticsearch};
     \node[rectangle, draw, fill=blue!20, below=of es, minimum width=1.8cm, minimum height=0.8cm] (jaeger) {Jaeger};
 
     % Messaging and cache
-    \node[rectangle, draw, fill=gray!20, right=4cm of prometheus, minimum width=1.6cm, minimum height=0.8cm] (kafka) {Kafka};
-    \node[rectangle, draw, fill=gray!20, right=3cm of es, minimum width=1.6cm, minimum height=0.8cm] (redis) {Redis};
+    \node[rectangle, draw, fill=gray!20, right=3cm of prometheus, minimum width=1.6cm, minimum height=0.8cm] (kafka) {Kafka};
+    \node[rectangle, draw, fill=gray!20, right=2.5cm of es, minimum width=1.6cm, minimum height=0.8cm] (redis) {Redis};
 
     % Agents
-    \node[rectangle, draw, fill=green!20, above right=2cm and 3cm of kafka, minimum width=2.2cm, minimum height=0.8cm] (collector) {Collector};
-    \node[rectangle, draw, fill=green!20, right=of collector, minimum width=2.2cm, minimum height=0.8cm] (detector) {Detector};
-    \node[rectangle, draw, fill=green!20, below=of detector, minimum width=2.2cm, minimum height=0.8cm] (diagnostic) {Diagnostic};
-    \node[rectangle, draw, fill=green!20, below=of collector, minimum width=2.2cm, minimum height=0.8cm] (orchestrator) {Orchestrator};
-    \node[rectangle, draw, fill=green!20, below=of orchestrator, minimum width=2.2cm, minimum height=0.8cm] (executor) {Safe Executor};
+    \node[rectangle, draw, fill=green!20, above right=1.5cm and 2.5cm of kafka, minimum width=2cm, minimum height=0.8cm] (collector) {Collector};
+    \node[rectangle, draw, fill=green!20, right=of collector, minimum width=2cm, minimum height=0.8cm] (detector) {Detector};
+    \node[rectangle, draw, fill=green!20, below=of detector, minimum width=2cm, minimum height=0.8cm] (diagnostic) {Diagnostic};
+    \node[rectangle, draw, fill=green!20, below=of collector, minimum width=2cm, minimum height=0.8cm] (orchestrator) {Orchestrator};
+    \node[rectangle, draw, fill=green!20, below=of orchestrator, minimum width=2cm, minimum height=0.8cm] (executor) {Safe Executor};
 
     % LLM / MCP
-    \node[rectangle, draw, fill=purple!20, above=of diagnostic, minimum width=2.2cm, minimum height=0.8cm] (llmagent) {LLM Agent};
-    \node[rectangle, draw, fill=purple!10, above=of llmagent, minimum width=2.2cm, minimum height=0.8cm] (mcp) {MCP Server};
-    \node[rectangle, draw, fill=red!10, above=of mcp, minimum width=2.2cm, minimum height=0.8cm] (llmprovider) {LLM Provider};
+    \node[rectangle, draw, fill=purple!20, above=of diagnostic, minimum width=2cm, minimum height=0.8cm] (llmagent) {LLM Agent};
+    \node[rectangle, draw, fill=purple!10, above=of llmagent, minimum width=2cm, minimum height=0.8cm] (mcp) {MCP Server};
+    \node[rectangle, draw, fill=red!10, above=of mcp, minimum width=2cm, minimum height=0.8cm] (llmprovider) {LLM Provider};
 
     % Business services (Kubernetes)
-    \node[rectangle, draw, fill=orange!20, right=5cm of detector, minimum width=2.4cm, minimum height=0.8cm] (svc1) {order-service};
-    \node[rectangle, draw, fill=orange!20, below=of svc1, minimum width=2.4cm, minimum height=0.8cm] (svc2) {payment-service};
-    \node[rectangle, draw, fill=orange!20, below=of svc2, minimum width=2.4cm, minimum height=0.8cm] (svc3) {inventory-service};
+    \node[rectangle, draw, fill=orange!20, right=3cm of detector, minimum width=2cm, minimum height=0.8cm] (svc1) {order-svc};
+    \node[rectangle, draw, fill=orange!20, below=of svc1, minimum width=2cm, minimum height=0.8cm] (svc2) {payment-svc};
+    \node[rectangle, draw, fill=orange!20, below=of svc2, minimum width=2cm, minimum height=0.8cm] (svc3) {inventory-svc};
 
     % Observability arrows
-    \draw[->, thick] (prometheus.east) -- node[above] {} (collector.west);
+    \draw[->, thick] (prometheus.east) -- (collector.west);
     \draw[->, thick] (es.east) -- (collector.west);
     \draw[->, thick] (jaeger.east) -- (collector.west);
 
@@ -73,14 +73,14 @@
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=2cm]
+\begin{tikzpicture}[node distance=1.8cm, scale=0.75, transform shape]
     \node[rectangle, draw, fill=blue!20, minimum width=2.5cm] (prometheus) {Prometheus};
     \node[rectangle, draw, fill=blue!20, below=of prometheus, minimum width=2.5cm] (elk) {ELK Stack};
     \node[rectangle, draw, fill=blue!20, below=of elk, minimum width=2.5cm] (jaeger) {Jaeger};
-    
-    \node[rectangle, draw, fill=green!20, right=4cm of prometheus, minimum width=2.8cm] (collector) {Data Collector};
-    \node[rectangle, draw, fill=yellow!20, right=3cm of collector, minimum width=2.8cm] (storage) {Time Series DB};
-    
+
+    \node[rectangle, draw, fill=green!20, right=3cm of prometheus, minimum width=2.8cm] (collector) {Data Collector};
+    \node[rectangle, draw, fill=yellow!20, right=2.5cm of collector, minimum width=2.8cm] (storage) {Time Series DB};
+
     \draw[->,thick] (prometheus) -- (collector);
     \draw[->,thick] (elk) -- (collector);
     \draw[->,thick] (jaeger) -- (collector);
