@@ -1,49 +1,100 @@
 \begin{titlepage}
+    \singlespacing
     \begin{center}
-        \vspace*{1cm}
-        
-        \textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ}\\
-        \textbf{Федеральное государственное автономное образовательное учреждение высшего образования}\\
-        \textbf{«РОССИЙСКИЙ УНИВЕРСИТЕТ ДРУЖБЫ НАРОДОВ»}
-        
-        \vspace{1cm}
-        
-        \textbf{Инженерная академия}\\
-        \textbf{Кафедра прикладной информатики и теории вероятностей}
-        
-        \vspace{2cm}
-        
-        \textbf{ВЫПУСКНАЯ КВАЛИФИКАЦИОННАЯ РАБОТА}\\
-        \textbf{на тему:}\\
-        \textbf{«Проектирование интеллектуальных автономных агентов для диагностики и самовосстановления распределённых систем»}
-        
-        \vspace{1cm}
-        
-        \textbf{Направление подготовки:} --\\
-        \textbf{Профиль:} --
-        
-        \vspace{2cm}
-        
-        \textbf{Выполнил:}\\
-        студент группы ИУСмд-01-24\\
-        Жендоренко Иван Борисович\\
-        
-        \vspace{0.5cm}
-        
-        \textbf{Руководитель:}\\
-        д-р техн. наук, проф.\\
-        Круглова Лариса Владимировна\\
-        
-        \vspace{0.5cm}
-        
-        \textbf{Консультант:}\\
-        канд. техн. наук, доц.\\
-        \rule{5cm}{0.4pt}
-        
-        \vfill
-        
-        \textbf{Москва}\\
-        \textbf{2026}
-        
+        \vspace*{-0.5cm}
+        Федеральное государственное автономное образовательное учреждение\\
+        высшего образования\\[3pt]
+        \textbf{«РОССИЙСКИЙ УНИВЕРСИТЕТ ДРУЖБЫ НАРОДОВ ИМЕНИ\\
+        ПАТРИСА ЛУМУМБЫ»}\\[3pt]
+        \textbf{ИНЖЕНЕРНАЯ АКАДЕМИЯ}\\[2pt]
+        Кафедра механики и процессов управления
+    \end{center}
+
+    \vspace{0.15cm}
+
+    \hfill\begin{tabular}[t]{@{}l@{\hspace{0.3cm}}l@{}}
+        \multicolumn{2}{c}{«ДОПУСТИТЬ К ЗАЩИТЕ»}\\
+        \multicolumn{2}{c}{Заведующий кафедрой}\\[8pt]
+        \makebox[4cm]{\uline{\hspace{4cm}}} & \makebox[4cm]{\uline{\hspace{0.2cm}\textit{Ю.Н. Разумный}\hspace{0.2cm}}}\\[-3pt]
+        \makebox[4cm]{\footnotesize (подпись)} & \makebox[4cm]{\footnotesize (ФИО)}\\[3pt]
+        \multicolumn{2}{c}{«\rule{1cm}{0.4pt}»\rule{3cm}{0.4pt} 2026 г.}
+    \end{tabular}
+
+    \vspace{0.4cm}
+
+    \begin{center}
+        \textbf{ВЫПУСКНАЯ КВАЛИФИКАЦИОННАЯ РАБОТА (ВКР)}
+    \end{center}
+
+    \vspace{0.2cm}
+
+    \newlength{\dirlen}
+    \settowidth{\dirlen}{\textbf{Направление/специальность:}~}
+    \noindent\textbf{Направление/специальность:} \uline{~27.04.04 Управление в технических системах\hfill}\par\vspace{-3pt}
+    \noindent\hspace*{\dirlen}{\footnotesize (шифр и название направления подготовки/специальности)}
+
+    \newlength{\proflen}
+    \settowidth{\proflen}{\textbf{Профиль/специализация:}~}
+    \noindent\textbf{Профиль/специализация:} \uline{~\textit{Искусственный интеллект и робототехнические}~}\\[-1pt]
+    \hspace*{\proflen}\uline{\textit{системы}\hfill}\par\vspace{-3pt}
+    \noindent\hspace*{\proflen}{\footnotesize (наименование образовательной программы)}
+
+    \vspace{0.15cm}
+
+    \newlength{\temalen}
+    \settowidth{\temalen}{\textbf{Тема ВКР:}~}
+    \noindent\textbf{Тема ВКР:} \uline{~\textit{Проектирование интеллектуальных автономных агентов для}~}\\[-1pt]
+    \hspace*{\temalen}\uline{\textit{диагностики и самовосстановления распределённых систем}\hfill}
+
+    \vspace{0.3cm}
+
+    % Выполнил
+    \noindent\makebox[4cm][l]{\textbf{Выполнил:}}%
+    \makebox[2.5cm]{\rule{2.5cm}{0.4pt}}\hspace{0.5cm}%
+    \underline{\makebox[7.5cm][c]{\textit{Жендоренко Иван Борисович}}}\\[-5pt]
+    \makebox[4cm][l]{}\makebox[2.5cm]{\footnotesize (подпись)}\hspace{0.5cm}\makebox[7.5cm]{\footnotesize (ФИО выпускника)}
+
+    \vspace{0.15cm}
+
+    % Группа
+    \noindent\makebox[4cm][l]{\textbf{Группа:}}%
+    \makebox[2.5cm]{}\hspace{0.5cm}%
+    \underline{\makebox[7.5cm][c]{\textit{ИУСмд-01-24}}}
+
+    \vspace{0.05cm}
+
+    % Студенческий билет
+    \noindent\makebox[4cm][l]{\textbf{Студенческий билет №:}}%
+    \makebox[2.5cm]{}\hspace{0.5cm}%
+    \underline{\makebox[7.5cm][c]{\textit{1132236523}}}
+
+    \vspace{0.15cm}
+
+    % Руководитель ВКР - степень
+    \noindent\makebox[4cm][l]{\textbf{Руководитель ВКР:}}%
+    \makebox[2.5cm]{}\hspace{0.5cm}%
+    \underline{\makebox[7.5cm][c]{\textit{к.т.н.}}}\\[-5pt]
+    \makebox[4cm][l]{}\makebox[2.5cm]{}\hspace{0.5cm}\makebox[7.5cm]{\footnotesize (ученая степень, ученое звание)}
+
+    \vspace{0.1cm}
+
+    % Руководитель ВКР - ФИО
+    \noindent\makebox[4cm][l]{}%
+    \makebox[2.5cm]{\rule{2.5cm}{0.4pt}}\hspace{0.5cm}%
+    \underline{\makebox[7.5cm][c]{\textit{Круглова Лариса Владимировна}}}\\[-5pt]
+    \makebox[4cm][l]{}\makebox[2.5cm]{\footnotesize (подпись)}\hspace{0.5cm}\makebox[7.5cm]{\footnotesize (ФИО руководителя ВКР)}
+
+    \vspace{0.15cm}
+
+    % Нормоконтроль
+    \noindent\makebox[4cm][l]{\textbf{Нормоконтроль:}}%
+    \makebox[2.5cm]{\rule{2.5cm}{0.4pt}}\hspace{0.5cm}%
+    \rule{7.5cm}{0.4pt}\\[-5pt]
+    \makebox[4cm][l]{}\makebox[2.5cm]{\footnotesize (подпись)}\hspace{0.5cm}\makebox[7.5cm]{\footnotesize (ФИО)}
+
+    \vfill
+
+    \begin{center}
+        \textbf{Москва, 2026 г.}
     \end{center}
 \end{titlepage}

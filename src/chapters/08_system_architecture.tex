@@ -1,14 +1,15 @@
-\chapter{Архитектура проектируемой системы}
+\chapter{Архитектура проектируемой системы}\label{ch:architecture}
 
 \section{Постановка задачи проектирования}
 
-Системы мониторинга, диагностики и восстановления часто реализуются как слабо связанные подсистемы, что приводит к задержкам между обнаружением инцидента и выполнением действий восстановления. Проектируемая система автоматизирует замкнутый контур <<обнаружение--диагностика--решение--восстановление>>.
+Существующие системы мониторинга, диагностики и восстановления работают как слабо связанные подсистемы, что вносит задержки между обнаружением инцидента и восстановлением. Проектируемая система автоматизирует замкнутый контур <<обнаружение--диагностика--решение--восстановление>>.
 
 Формально задача: минимизировать время восстановления
 \begin{equation}
 \text{MTTR} = T_{\text{detection}} + T_{\text{diagnosis}} + T_{\text{recovery}} \to \min
 \label{eq:mttr_minimization}
 \end{equation}
+\textit{Примечание.} В отличие от полной декомпозиции MTTR~(\ref{eq:mttr_components}), компонент $T_{\text{verification}}$ исключён из целевой функции оптимизации, так как он фиксирован для заданной инфраструктуры и не поддаётся сокращению средствами агентов.
 при ограничениях:
 \begin{align}
 P(\text{detection}) &> \theta_{\text{precision}}, \label{eq:precision_constraint} \\
@@ -20,7 +21,7 @@ P(\text{safe\_recovery}) &> \theta_{\text{safety}}. \label{eq:safety_constraint}
 
 \section{Модули системы}
 
-Архитектура включает шесть модулей, организованных в конвейер обработки инцидентов.
+Архитектура включает шесть модулей, организованных в конвейер обработки инцидентов. Общая схема представлена на рисунке~\ref{fig:system_architecture}; детализированная архитектура и поток данных --- на рисунках~\ref{fig:appendix_full_architecture} и~\ref{fig:appendix_data_flow} в Приложении~А.
 
 \begin{figure}[H]
 \centering
@@ -53,11 +54,11 @@ d = (\text{timestamp}, \text{source}, \text{type}, \text{value}, \text{metadata}
 \label{eq:unified_data_model}
 \end{equation}
 
-Нормализация выполняется для каждого источника: $D_{\text{normalized}} = \bigcup_{i=1}^{n} f_{\text{normalize},i}(D_i)$. Время сбора определяется самым медленным источником: $T_{\text{collection}} = \max_{i} T_{\text{collect},i}$.
+Каждый источник нормализуется: $D_{\text{normalized}} = \bigcup_{i=1}^{n} f_{\text{normalize},i}(D_i)$. Время сбора определяется самым медленным источником: $T_{\text{collection}} = \max_{i} T_{\text{collect},i}$.
 
-\subsection{Anomaly Analyzer}
+\subsection{Anomaly Detector}
 
-Модуль объединяет результаты нескольких методов обнаружения (глава~6) через ансамблевую оценку:
+Модуль объединяет результаты нескольких методов обнаружения (раздел~\ref{ch:anomaly}) через ансамблевую оценку:
 \begin{equation}
 \text{Anomaly Score} = \sum_{i=1}^{m} w_i \cdot r_i, \quad w_i = \frac{\exp(\alpha \cdot \text{accuracy}_i)}{\sum_{j=1}^{m} \exp(\alpha \cdot \text{accuracy}_j)}
 \label{eq:ensemble_anomaly}
@@ -66,7 +67,7 @@ d = (\text{timestamp}, \text{source}, \text{type}, \text{value}, \text{metadata}
 
 \subsection{LLM Agent}
 
-Модуль анализирует неструктурированные логи и генерирует рекомендации для разработчиков, используя большие языковые модели через Model Context Protocol (глава~10):
+Модуль анализирует неструктурированные логи и генерирует рекомендации для разработчиков, используя большие языковые модели через Model Context Protocol (раздел~\ref{ch:prototype}):
 \begin{equation}
 \text{Recommendations} = \text{LLM-Agent}(L, C, \text{Metrics}, \text{Traces})
 \label{eq:llm_agent_recommendations}
@@ -96,12 +97,12 @@ P(v_i \to v_j) = \sigma\left(\sum_{k} w_k \cdot f_k(v_i, v_j)\right)
 \label{eq:causal_probability_arch}
 \end{equation}
 \begin{itemize}
-    \item Временная близость: $f_{\text{time}}(v_i, v_j) = \exp(-|t_i - t_j|/\tau)$
-    \item Корреляция метрик: $f_{\text{corr}}(v_i, v_j) = |\rho(v_i, v_j)|$
-    \item Зависимость в трейсе: $f_{\text{trace}}(v_i, v_j) = \mathbf{1}[\text{parent}(v_j) = v_i]$
+    \item Временная близость: $f_{\text{time}}(v_i, v_j) = \exp(-|t_i - t_j|/\tau)$;
+    \item Корреляция метрик: $f_{\text{corr}}(v_i, v_j) = |\rho(v_i, v_j)|$;
+    \item Зависимость в трейсе: $f_{\text{trace}}(v_i, v_j) = \mathbf{1}[\text{parent}(v_j) = v_i]$.
 \end{itemize}
 
-Рёбра включаются в граф при условии $P(v_i \to v_j) > \theta$ и подтверждения причинности по критерию Грейнджера \cite{lamport_distributed_systems,lynch_distributed_algorithms}:
+Рёбра включаются в граф при условии $P(v_i \to v_j) > \theta$ и подтверждения причинности по критерию Грейнджера \cite{granger_causality}:
 \begin{equation}
 v_j \text{ causes } v_i \Leftrightarrow \text{var}(\epsilon_{i|v_j}) < \text{var}(\epsilon_{i|\neg v_j})
 \label{eq:granger_causality_arch}
@@ -117,7 +118,7 @@ v_j \text{ causes } v_i \Leftrightarrow \text{var}(\epsilon_{i|v_j}) < \text{var
 
 \section{Механизм консенсуса агентов}
 
-При наличии нескольких источников рекомендаций (Diagnostic Engine, LLM-агент, rule-based политики) необходимо согласование \cite{wooldridge_agents,multi_agent_systems,herlihy_art_multiprocessor}. Мнение агента $A_i$ о действии $a$: $o_i(a) \in [0, 1]$. Вес определяется исторической точностью:
+При наличии нескольких источников рекомендаций (Diagnostic Engine, LLM-агент, rule-based политики) необходимо согласование \cite{wooldridge_agents,herlihy_art_multiprocessor}. Мнение агента $A_i$ о действии $a$: $o_i(a) \in [0, 1]$. Вес определяется исторической точностью:
 \begin{equation}
 w_i = \frac{\exp(\alpha \cdot \text{accuracy}_i)}{\sum_{j=1}^{n} \exp(\alpha \cdot \text{accuracy}_j)}
 \label{eq:agent_weight}
@@ -195,4 +196,4 @@ P(\text{success}|a, s) = \prod_{i=1}^{k} P_i(\text{success}|a, s)
 
 \medskip
 
-Архитектура задаёт формальный каркас интеграции модулей: оптимизация MTTR при ограничениях на точность и безопасность, ансамблевый анализ аномалий, причинно-следственная диагностика и многоуровневая система безопасности исполнения. В главе~10 данная архитектура реализуется в виде прототипа, а в главе~11 проходит экспериментальную проверку.
+Архитектура задаёт формальный каркас интеграции модулей: оптимизация MTTR при ограничениях на точность и безопасность, ансамблевый анализ аномалий, причинно-следственная диагностика и многоуровневая система безопасности исполнения. В разделе~\ref{ch:prototype} эта архитектура реализуется в виде прототипа, а в разделе~\ref{ch:experiments} проходит экспериментальную проверку.

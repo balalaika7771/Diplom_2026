@@ -47,10 +47,10 @@
     \draw[->, thick] (kafka.east) |- (executor.west);
 
     % Agents chain
-    \draw[->, thick] (detector.south) -- node[right] {Anomalies} (diagnostic.north);
-    \draw[->, thick] (diagnostic.west) -- node[above] {Root Cause} (orchestrator.east);
-    \draw[->, thick] (orchestrator.south) -- node[right] {Actions} (executor.north);
-    \draw[->, thick, dashed, bend left=25] (executor.west) to node[left] {Feedback} (collector.south);
+    \draw[->, thick] (detector.south) -- node[right] {Аномалии} (diagnostic.north);
+    \draw[->, thick] (diagnostic.west) -- node[above] {Корневая причина} (orchestrator.east);
+    \draw[->, thick] (orchestrator.south) -- node[right] {Действия} (executor.north);
+    \draw[->, thick, dashed, bend left=25] (executor.west) to node[left] {Обратная связь} (collector.south);
 
     % LLM / MCP
     \draw[->, thick] (diagnostic.north) -- (llmagent.south);

@@ -27,7 +27,7 @@
 
 Разработана архитектура системы интеллектуальных агентов, включающая подсистемы сбора данных, анализа аномалий, причинно-следственной диагностики, принятия решений (на основе правил и методов обучения с подкреплением) и безопасного пошагового применения действий, реализованная в виде прототипа на платформе Java/Spring Boot с использованием Kafka, Redis, InfluxDB, Elasticsearch, OpenTelemetry и Model Context Protocol.
 
-Проведено экспериментальное исследование на кластере Kubernetes из 10 сервисов с использованием синтетических и реальных эксплуатационных данных. Показано снижение среднего времени восстановления инцидентов (MTTR) примерно на 45\%, повышение точности обнаружения аномалий до 94{,}2\%, а также сокращение доли ложных срабатываний на 38\% по сравнению с базовой конфигурацией мониторинга и ручного реагирования.
+Проведено экспериментальное исследование на кластере Kubernetes из 10 сервисов с использованием синтетических и реальных эксплуатационных данных. Показано снижение среднего времени восстановления инцидентов (MTTR) примерно на 44{,}8\%, повышение точности обнаружения аномалий до 91{,}8\%, а также сокращение доли ложных срабатываний на 71\% по сравнению с базовой конфигурацией мониторинга и ручного реагирования.
 
 \textbf{Научная новизна} работы состоит в построении единой математически обоснованной архитектуры интеллектуальных агентов для автоматической диагностики и самовосстановления распределённых систем, а также в разработке метода построения причинно-следственных графов на основе совмещённого анализа метрик и трассировок, повышающего точность локализации корневых причин инцидентов.
 
@@ -61,7 +61,7 @@ The thesis presents a comprehensive analysis of architectural and operational ap
 
 An architecture of an intelligent multi-agent system is proposed, combining metric- and log-based detectors, a causal diagnostic engine, decision-making components and a safe execution layer, and implemented as a prototype on a Java/Spring Boot platform integrated with Kafka, Redis, InfluxDB, Elasticsearch and OpenTelemetry via the Model Context Protocol.
 
-Experiments on a Kubernetes cluster with ten microservices and a mix of synthetic and real production traces demonstrate a reduction of mean time to recovery (MTTR) by approximately 45\%, an increase of anomaly detection precision to 94.2\%, and a 38\% decrease in false positives compared to traditional monitoring and manual operation.
+Experiments on a Kubernetes cluster with ten microservices and a mix of synthetic and real production traces demonstrate a reduction of mean time to recovery (MTTR) by approximately 44.8\%, an increase of anomaly detection precision to 91.8\%, and a 71\% decrease in false positives compared to traditional monitoring and manual operation.
 
 \textbf{Scientific novelty} lies in the development of a unified, formally grounded architecture for intelligent self-healing agents and in a new method for constructing causal graphs from metrics and trace data, which improves the accuracy of incident localization.
 

@@ -18,7 +18,7 @@
 \setlength{\parindent}{1.25cm}
 
 % Настройки шрифтов по ГОСТу для pdfLaTeX
-\usepackage{times}
+\usepackage{tempora}
 
 % Настройки заголовков по ГОСТу 7.32-2017 и требованиям РУДН
 % Заголовки структурных элементов - по центру, прописными буквами, без точки в конце
@@ -29,11 +29,11 @@
 
 \titleformat{\section}
 {\normalfont\bfseries\centering}
-{\MakeUppercase{\thesection}}{1em}{\MakeUppercase}
+{\thesection}{1em}{}
 
 \titleformat{\subsection}
 {\normalfont\bfseries\centering}
-{\MakeUppercase{\thesubsection}}{1em}{\MakeUppercase}
+{\thesubsection}{1em}{}
 
 % Настройки оглавления по ГОСТу 7.32-2017
 \renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
@@ -119,7 +119,7 @@
 \captionsetup[table]{format=gosttable}
 
 % Настройка переноса таблиц с заголовком "Продолжение таблицы X"
-\usepackage{longtable}
+% \usepackage{longtable} % уже загружен в packages.tex
 \usepackage{ltxtable}
 
 % Команда для создания продолжения таблицы
@@ -201,7 +201,7 @@
 }
 
 % Настройка межстрочного интервала для многострочных подписей
-\captionsetup[table]{format=gosttable,skip=6pt}
+% \captionsetup[table]{format=gosttable,skip=6pt} % уже задано выше
 
 % Настройки списков рисунков и таблиц
 \renewcommand{\listfigurename}{СПИСОК ИЛЛЮСТРАЦИЙ}
@@ -213,10 +213,7 @@
 
 % ===== АВТОМАТИЧЕСКИЕ ПРАВИЛА ГОСТ =====
 
-% Автоматические переносы слов по ГОСТу
-\usepackage[english,russian]{babel}
-\babelprovide[import]{russian}
-\babelprovide[import]{english}
+% babel уже загружен в packages.tex
 
 % Автоматические отступы для списков по ГОСТу
 \setlength{\leftmargini}{2.5em}  % отступ для enumerate
@@ -244,8 +241,7 @@
 \setlength{\belowdisplayshortskip}{0pt}
 
 % Автоматические правила для ссылок
-\renewcommand{\autoref}[1]{\textbf{\ref{#1}}}
-\renewcommand{\nameref}[1]{\textbf{\ref{#1}}}
+% \autoref и \nameref не переопределяются — используются стандартные из hyperref
 
 % Автоматические правила для абзацев
 \setlength{\parskip}{0pt}  % без отступов между абзацами
@@ -354,11 +350,13 @@
 % ===== КОМАНДЫ ДЛЯ АВТОМАТИКИ (ПО ГОСТ 7.32-2017) =====
 
 % Стили для блок-схем по ГОСТ 19.701-90
-\tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30]
-\tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30]
-\tikzstyle{decision} = [diamond, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=yellow!30]
-\tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30]
-\tikzstyle{arrow} = [thick,->,>=stealth]
+\tikzset{
+  startstop/.style={rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30},
+  process/.style={rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30},
+  decision/.style={diamond, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=yellow!30},
+  io/.style={trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30},
+  arrow/.style={thick,->,>=stealth}
+}
 
 % Блок-схема алгоритма по ГОСТ 19.701-90
 \newcommand{\autoblockdiagram}[3]{%
