@@ -68,7 +68,7 @@
 \setlength{\bibhang}{1.25cm}
 
 % Перенос длинных URL в библиографии
-\DeclareFieldFormat*{url}{\url{#1}}
+% URL formatting handled by biblatex-gost automatically
 \appto{\bibsetup}{\sloppy}
 
 % Настройки гиперссылок
@@ -81,11 +81,11 @@
     bookmarksnumbered=true,
     bookmarksopen=true,
     pdfstartview=FitH,
-    breaklinks=true
+    breaklinks=false
 }
 
-% Разрешить переносы в URL на любом символе
-\def\UrlBreaks{\do\/\do-\do_\do.\do=\do?\do\&\do\%\do\#\do\~\do\\}
+% Настройка шрифта URL (monospace для избежания пробелов в math mode)
+\urlstyle{tt}
 
 % Настройки нумерации по ГОСТу 7.32-2017
 % Глобальная нумерация рисунков и таблиц по всей диссертации
@@ -297,6 +297,7 @@
 
 % Автоматические правила для списков литературы
 \renewcommand{\bibname}{СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ}
+\biburlbigskip=0mu\relax  % Убираем растяжимые пробелы в URL библиографии
 
 % Автоматические правила для оглавления
 \renewcommand{\contentsname}{ОГЛАВЛЕНИЕ}
