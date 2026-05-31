@@ -52,227 +52,13 @@ jobs:
         run: |
           bash scripts/merge_diploma.sh
 
-      - name: Convert PDF to DOCX via API
-        env:
-          CLOUDCONVERT_API_KEY: ${{ secrets.CLOUDCONVERT_API_KEY }}
-        run: |
-          cd build
-          
-          # Функция для проверки валидности DOCX файла
-          check_docx_valid() {
-            local docx_file="$1"
-            if [ ! -f "$docx_file" ] || [ ! -s "$docx_file" ]; then
-              echo "  ❌ Файл не существует или пустой"
-              return 1
-            fi
-            
-            # Проверяем размер (должен быть больше 20KB для надежности)
-            local FILE_SIZE=$(stat -c%s "$docx_file" 2>/dev/null || echo "0")
-            if [ "$FILE_SIZE" -lt 20000 ]; then
-              echo "  ❌ Файл слишком маленький ($FILE_SIZE байт)"
-              return 1
-            fi
-            
-            # Проверяем, что это валидный ZIP архив (DOCX это ZIP)
-            if ! unzip -t -q "$docx_file" 2>/dev/null; then
-              echo "  ❌ Файл не является валидным ZIP архивом"
-              return 1
-            fi
-            
-            # Проверяем наличие обязательных файлов в DOCX
-            if ! unzip -l "$docx_file" 2>/dev/null | grep -q "word/document.xml"; then
-              echo "  ❌ Отсутствует word/document.xml"
-              return 1
-            fi
-            
-            echo "  ✓ DOCX файл валиден (размер: $FILE_SIZE байт)"
-            return 0
-          }
-          
-          if [ ! -f main.pdf ]; then
-            echo "❌ PDF файл не найден"
-            exit 1
-          fi
-          
-          PDF_SIZE=$(stat -c%s main.pdf 2>/dev/null || echo "0")
-          echo "PDF размер: $PDF_SIZE байт"
-          
-          if [ "$PDF_SIZE" -lt 10000 ]; then
-            echo "⚠ PDF файл слишком маленький, пропускаем конвертацию"
-            exit 0
-          fi
-          
-          # Проверяем наличие API ключа
-          if [ -z "$CLOUDCONVERT_API_KEY" ]; then
-            echo "⚠ CLOUDCONVERT_API_KEY не установлен, пропускаем конвертацию в DOCX"
-            echo "Для использования API конвертации установите секрет CLOUDCONVERT_API_KEY в настройках репозитория"
-            exit 0
-          fi
-          
-          echo "=== Конвертация PDF в DOCX через CloudConvert API ==="
-          
-          # Устанавливаем curl и jq если нужно
-          if ! command -v curl &> /dev/null; then
-            echo "Установка curl..."
-            sudo apt-get update && sudo apt-get install -y curl
-          fi
-          
-          if ! command -v jq &> /dev/null; then
-            echo "Установка jq..."
-            sudo apt-get install -y jq
-          fi
-          
-          # Создаем job с задачами: import -> convert -> export
-          echo "Создание job для конвертации PDF -> DOCX..."
-          JOB_RESPONSE=$(curl -s -X POST "https://api.cloudconvert.com/v2/jobs" \
-            -H "Authorization: Bearer $CLOUDCONVERT_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "tasks": {
-                "import-1": {
-                  "operation": "import/upload"
-                },
-                "convert-1": {
-                  "operation": "convert",
-                  "input": "import-1",
-                  "output_format": "docx",
-                  "input_format": "pdf"
-                },
-                "export-1": {
-                  "operation": "export/url",
-                  "input": "convert-1"
-                }
-              }
-            }')
-          
-          JOB_ID=$(echo "$JOB_RESPONSE" | jq -r '.data.id // empty')
-          
-          if [ -z "$JOB_ID" ]; then
-            echo "Ошибка: не удалось создать job"
-            echo "Ответ API: $JOB_RESPONSE"
-            exit 1
-          fi
-          
-          echo "Job создан: $JOB_ID"
-          
-          # Получаем информацию о задаче импорта для загрузки файла
-          IMPORT_TASK_ID=$(echo "$JOB_RESPONSE" | jq -r '.data.tasks[] | select(.name == "import-1") | .id // empty')
-          
-          if [ -z "$IMPORT_TASK_ID" ]; then
-            echo "Ошибка: не удалось получить ID задачи импорта"
-            exit 1
-          fi
-          
-          echo "Получение URL для загрузки файла..."
-          IMPORT_TASK_INFO=$(curl -s -X GET "https://api.cloudconvert.com/v2/tasks/$IMPORT_TASK_ID" \
-            -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
-          
-          UPLOAD_URL=$(echo "$IMPORT_TASK_INFO" | jq -r '.data.result.form.url // empty')
-          if [ -z "$UPLOAD_URL" ]; then
-            echo "Ошибка: не удалось получить URL для загрузки"
-            echo "Ответ API: $IMPORT_TASK_INFO"
-            exit 1
-          fi
-          
-          # Загружаем PDF файл (все параметры из form.parameters + file последним)
-          echo "Загрузка PDF файла..."
-          echo "$IMPORT_TASK_INFO" | python3 -c "
-          import json, sys, subprocess
-          data = json.load(sys.stdin)
-          url = data['data']['result']['form']['url']
-          params = data['data']['result']['form']['parameters']
-          cmd = ['curl', '-s', '-L', '-X', 'POST', url]
-          for k, v in params.items():
-              cmd.extend(['-F', f'{k}={v}'])
-          cmd.extend(['-F', 'file=@main.pdf'])
-          subprocess.run(cmd, check=True)
-          "
-          
-          # Ждем завершения job
-          echo "Ожидание завершения конвертации..."
-          MAX_WAIT=600  # 10 минут максимум
-          WAIT_TIME=0
-          SLEEP_INTERVAL=3
-          
-          while [ $WAIT_TIME -lt $MAX_WAIT ]; do
-            sleep $SLEEP_INTERVAL
-            WAIT_TIME=$((WAIT_TIME + SLEEP_INTERVAL))
-            
-            JOB_STATUS=$(curl -s -X GET "https://api.cloudconvert.com/v2/jobs/$JOB_ID" \
-              -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
-            
-            STATUS=$(echo "$JOB_STATUS" | jq -r '.data.status // empty')
-            echo "Статус job: $STATUS (ожидание: ${WAIT_TIME}с)"
-            
-            if [ "$STATUS" = "finished" ]; then
-              # Получаем информацию о задаче экспорта
-              EXPORT_TASK_ID=$(echo "$JOB_STATUS" | jq -r '.data.tasks[] | select(.name == "export-1") | .id // empty')
-              
-              if [ -n "$EXPORT_TASK_ID" ]; then
-                EXPORT_INFO=$(curl -s -X GET "https://api.cloudconvert.com/v2/tasks/$EXPORT_TASK_ID" \
-                  -H "Authorization: Bearer $CLOUDCONVERT_API_KEY")
-                
-                DOWNLOAD_URL=$(echo "$EXPORT_INFO" | jq -r '.data.result.files[0].url // empty')
-                
-                if [ -n "$DOWNLOAD_URL" ]; then
-                  echo "Скачивание DOCX файла..."
-                  curl -s -L "$DOWNLOAD_URL" -o main.docx
-                  
-                  if check_docx_valid main.docx; then
-                    FILE_SIZE=$(stat -c%s main.docx 2>/dev/null || echo "0")
-                    echo "✓ DOCX файл успешно создан через CloudConvert API (размер: $FILE_SIZE байт)"
-                    exit 0
-                  else
-                    echo "⚠ Скачанный файл невалиден"
-                    exit 1
-                  fi
-                else
-                  echo "Ошибка: не удалось получить URL для скачивания"
-                  echo "$EXPORT_INFO" | jq '.'
-                  exit 1
-                fi
-              else
-                echo "Ошибка: не удалось найти задачу экспорта"
-                exit 1
-              fi
-              break
-            elif [ "$STATUS" = "error" ]; then
-              echo "Ошибка конвертации"
-              echo "$JOB_STATUS" | jq '.'
-              exit 1
-            fi
-          done
-          
-          if [ $WAIT_TIME -ge $MAX_WAIT ]; then
-            echo "Таймаут ожидания конвертации (превышен лимит ${MAX_WAIT}с)"
-            exit 1
-          fi
-          
-          # Финальная проверка
-          if ! check_docx_valid main.docx; then
-            echo "❌ Ошибка: DOCX файл невалиден"
-            exit 1
-          fi
-          
-          FILE_SIZE=$(stat -c%s main.docx 2>/dev/null || echo "0")
-          echo ""
-          echo "✓ Word документ создан успешно и валиден (размер: $FILE_SIZE байт)"
-          ls -lh main.docx
-
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
         with:
           name: dissertation-pdf
           path: build/final.pdf
 
-      - name: Upload Word artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dissertation-word
-          path: build/main.docx
-        continue-on-error: true
-
-      - name: Create GitHub Release with PDF and Word
+      - name: Create GitHub Release with PDF
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
@@ -282,7 +68,6 @@ jobs:
           prerelease: true
           files: |
             build/final.pdf
-            build/main.docx
 
       - name: Upload to Yandex Disk
         if: github.ref == 'refs/heads/main'
@@ -403,11 +188,6 @@ jobs:
           
           # Загружаем PDF (мы находимся в корне репозитория)
           upload_file "build/final.pdf" "${BUILD_FOLDER}/final.pdf"
-          
-          # Загружаем Word (если создан)
-          if [ -f "build/main.docx" ]; then
-            upload_file "build/main.docx" "${BUILD_FOLDER}/main.docx"
-          fi
           
           echo "Все файлы загружены в: $BUILD_FOLDER"
           echo "Просмотр: https://disk.yandex.ru/d/RRdCy4WNyrE3xA"
