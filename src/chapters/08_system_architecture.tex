@@ -27,7 +27,7 @@ P(\text{safe\_recovery}) &> \theta_{\text{safety}}. \label{eq:safety_constraint}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=0.8cm, auto, scale=0.95, transform shape, font=\small]
+\begin{tikzpicture}[node distance=0.8cm, auto, scale=0.95, transform shape, font=\normalsize]
     \node[rectangle, draw, fill=blue!20, minimum width=1cm, minimum height=0.6cm] (collector) {Collector};
     \node[rectangle, draw, fill=green!20, right=of collector, minimum width=1cm, minimum height=0.6cm] (analyzer) {Analyzer};
     \node[rectangle, draw, fill=yellow!20, right=of analyzer, minimum width=1cm, minimum height=0.6cm] (diagnostic) {Diagnostic};
@@ -50,7 +50,7 @@ P(\text{safe\_recovery}) &> \theta_{\text{safety}}. \label{eq:safety_constraint}
 
 \begin{table}[H]
 \centering
-\small
+
 \caption{Модули системы и их функции}
 \label{tab:system_modules}
 \begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{4cm}|}
@@ -165,7 +165,7 @@ o_i^{(t+1)}(a) = \sum_{j=1}^{n} T_{ij} \cdot o_j^{(t)}(a), \quad \lim_{t \to \in
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+\begin{tikzpicture}[scale=0.7, transform shape, font=\normalsize,
     agent/.style={rectangle, draw, fill=blue!15, minimum width=1.5cm, minimum height=0.6cm}]
     \node[agent] (de) {Diagnostic};
     \node[agent, below=0.5cm of de] (llm) {LLM};
@@ -240,7 +240,7 @@ P(\text{success}|a, s) = \prod_{i=1}^{k} P_i(\text{success}|a, s)
 
 \begin{table}[H]
 \centering
-\small
+
 \caption{Уровни безопасности действий восстановления}
 \label{tab:safety_levels}
 \begin{tabular}{|>{\raggedright\arraybackslash}p{2cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{2.5cm}|}
@@ -260,7 +260,7 @@ Critical & Risk $\geq \theta_3$ & Только вручную & Изменени
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+\begin{tikzpicture}[scale=0.7, transform shape, font=\normalsize,
     box/.style={rectangle, draw, fill=orange!15, minimum width=1.5cm, minimum height=0.6cm}]
     \node[box] (validate) {Валидация};
     \node[box, right=1cm of validate] (gradual) {Gradual};

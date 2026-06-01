@@ -14,7 +14,7 @@ T_{\text{delivery}} = T_{\text{build}} + T_{\text{test}} + T_{\text{deploy}} + T
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+\begin{tikzpicture}[scale=0.7, transform shape, font=\normalsize,
     stage/.style={rectangle, draw, fill=green!15, minimum width=1.2cm, minimum height=0.6cm}]
     \node[stage] (build) {Build};
     \node[stage, right=0.8cm of build] (test) {Test};
@@ -91,7 +91,7 @@ E[\text{damage}_{\text{BG}}] = p_{\text{error}} \cdot \text{Cost}(\text{test\_fa
 
 \begin{table}[H]
 \centering
-\small
+
 \caption{Сравнение стратегий развёртывания}
 \label{tab:deploy_strategies}
 \begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{4.5cm}|}
@@ -133,7 +133,7 @@ Service Level Indicator (SLI) измеряет фактический урове
 
 \begin{table}[H]
 \centering
-\small
+
 \caption{Примеры SLO и соответствующих SLI}
 \label{tab:slo_sli_examples}
 \begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{4cm}|}

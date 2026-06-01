@@ -64,7 +64,7 @@ ML-инференс & DeepLearning4j & LSTM-модель обнаружения 
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=0.8cm, auto, scale=1.0, transform shape, font=\small]
+\begin{tikzpicture}[node distance=0.8cm, auto, scale=1.0, transform shape, font=\normalsize]
     \node[rectangle, draw, fill=blue!20, minimum width=1.2cm, minimum height=0.6cm] (prometheus) {Prometheus};
     \node[rectangle, draw, fill=green!20, below=of prometheus, minimum width=1.2cm, minimum height=0.6cm] (elasticsearch) {Elasticsearch};
     \node[rectangle, draw, fill=yellow!20, below=of elasticsearch, minimum width=1.2cm, minimum height=0.6cm] (jaeger) {Jaeger};
@@ -171,7 +171,7 @@ MCP --- протокол на основе JSON-RPC~2.0 для стандарт�
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=1.5cm, auto, scale=1.0, transform shape, font=\small]
+\begin{tikzpicture}[node distance=1.5cm, auto, scale=1.0, transform shape, font=\normalsize]
     \node[rectangle, draw, fill=blue!20, minimum width=2cm, minimum height=0.8cm] (llm) {LLM-провайдер};
     \node[rectangle, draw, fill=green!20, below=of llm, minimum width=2.5cm, minimum height=0.8cm] (mcp) {MCP-сервер};
     \node[rectangle, draw, fill=yellow!20, below left=of mcp, minimum width=2cm, minimum height=0.8cm] (ctx) {system\_context};
@@ -283,7 +283,7 @@ T_{\text{OOM}} = \arg\min_t \{t : \hat{M}_{\text{mem}}(t) > \theta_{\text{OOM}}\
 \addplot[red,dashed,thick] coordinates {
     (30, 95) (40, 65)
 };
-\node at (axis cs:35,80) {\small Восст.};
+\node at (axis cs:35,80) { Восст.};
 \legend{Загрузка CPU, Восстановление}
 \end{axis}
 \end{tikzpicture}

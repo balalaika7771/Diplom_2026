@@ -14,7 +14,6 @@ T_{\text{sync}} = \sum_{i=1}^{n} (T_{\text{request},i} + T_{\text{network},i} + 
 
 \begin{table}[H]
 \centering
-\small
 \caption{Сравнение синхронных и асинхронных архитектур}
 \label{tab:sync_async_compare}
 \begin{tabular}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{3.5cm}|}
@@ -86,7 +85,6 @@ R = \bigcup_{i=1}^{k} R_i, \quad R_i \cap R_j = \emptyset, \quad \text{Overload}
 
 \begin{table}[H]
 \centering
-\small
 \caption{Сравнение паттернов устойчивости}
 \label{tab:resilience_patterns}
 \begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{4cm}|}
@@ -104,7 +102,7 @@ Bulkhead & Изоляция ресурсов & Разделение на пул�
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+\begin{tikzpicture}[scale=0.7, transform shape,
     state/.style={rectangle, draw, fill=blue!15, minimum width=1.2cm, minimum height=0.6cm}]
     \node[state] (closed) {CLOSED};
     \node[state, right=1.5cm of closed] (open) {OPEN};
