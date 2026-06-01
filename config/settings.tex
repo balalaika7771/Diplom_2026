@@ -12,7 +12,7 @@
 \setlength{\footskip}{20pt}
 
 % Межстрочный интервал 1.5 по ГОСТу
-\onehalfspacing
+\setstretch{1.5}
 
 % Убираем вертикальные отступы в списках (itemize, enumerate)
 \makeatletter
@@ -281,7 +281,7 @@
 % \autoref и \nameref не переопределяются — используются стандартные из hyperref
 
 % Автоматические правила для абзацев
-\AtBeginDocument{\setlength{\parskip}{0pt}}  % без отступов между абзацами (после всех пакетов)
+\setlength{\parskip}{0pt}  % без отступов между абзацами
 \setlength{\parindent}{1.25cm}  % отступ первой строки по ГОСТу
 
 % Автоматические правила для переноса страниц
