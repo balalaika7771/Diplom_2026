@@ -12,6 +12,26 @@ T_{\text{sync}} = \sum_{i=1}^{n} (T_{\text{request},i} + T_{\text{network},i} + 
 \label{eq:sync_total_time}
 \end{equation}
 
+\begin{table}[H]
+\centering
+\small
+\caption{Сравнение синхронных и асинхронных архитектур}
+\label{tab:sync_async_compare}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{3.5cm}|}
+\hline
+Характеристика & Синхронная & Асинхронная \\
+\hline
+Задержка & Линейный рост & Постоянная (очередь) \\
+\hline
+Отказоустойчивость & Каскадные отказы & Изоляция через очереди \\
+\hline
+Сложность & Низкая & Высокая (консистентность) \\
+\hline
+Масштабируемость & Ограничена & Высокая \\
+\hline
+\end{tabular}
+\end{table}
+
 Асинхронная архитектура через очереди сообщений \cite{kleppmann_designing_data} устраняет блокировки. Для очереди M/M/1 с интенсивностью поступления $\lambda$ и обслуживания $\mu$ условие стабильности и среднее время пребывания в системе составляют:
 \begin{equation}
 \rho = \frac{\lambda}{\mu} < 1, \quad T_{\text{system}} = \frac{1}{\mu - \lambda}
@@ -63,6 +83,40 @@ T_{\text{delay},i} = T_{\text{base}} \cdot 2^{i-1} + \text{random}(0, T_{\text{j
 R = \bigcup_{i=1}^{k} R_i, \quad R_i \cap R_j = \emptyset, \quad \text{Overload}(R_i) \not\Rightarrow \text{Overload}(R_j)
 \label{eq:bulkhead}
 \end{equation}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Сравнение паттернов устойчивости}
+\label{tab:resilience_patterns}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{4cm}|}
+\hline
+Паттерн & Назначение & Механизм \\
+\hline
+Circuit Breaker & Предотвращение каскадов & Состояния CLOSED/OPEN/HALF\_OPEN \\
+\hline
+Retry & Восстановление при сбоях & Экспоненциальная задержка \\
+\hline
+Bulkhead & Изоляция ресурсов & Разделение на пулы \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+    state/.style={rectangle, draw, fill=blue!15, minimum width=1.2cm, minimum height=0.6cm}]
+    \node[state] (closed) {CLOSED};
+    \node[state, right=1.5cm of closed] (open) {OPEN};
+    \node[state, below right=0.8cm and 0.5cm of closed] (half) {HALF\_OPEN};
+    \draw[->] (closed) -- node[above] {failures $\geq \theta$} (open);
+    \draw[->] (open) -- node[right] {timeout} (half);
+    \draw[->] (half) -- node[below] {success} (closed);
+    \draw[->] (half) -- node[below right] {failure} (open);
+\end{tikzpicture}
+\caption{Конечный автомат Circuit Breaker}
+\label{fig:circuit_breaker_fsm}
+\end{figure}
 
 \textbf{Использование агентами.} Diagnostic Engine (раздел~\ref{ch:architecture}) распознаёт состояние circuit breaker через анализ метрик ошибок и задержек: резкий рост $T_{\text{response}}$ с последующим падением до нуля указывает на переход в OPEN. Safe Executor при восстановлении каскадного отказа применяет паттерны в определённом порядке: (1)~активирует circuit breaker на проблемном сервисе, (2)~масштабирует зависимые сервисы, (3)~постепенно открывает circuit breaker (HALF\_OPEN) с мониторингом метрик. Это реализовано в сценарии~2 прототипа (раздел~\ref{ch:prototype}).
 

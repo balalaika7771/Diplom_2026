@@ -48,6 +48,30 @@ P(\text{safe\_recovery}) &> \theta_{\text{safety}}. \label{eq:safety_constraint}
 \label{fig:system_architecture}
 \end{figure}
 
+\begin{table}[H]
+\centering
+\small
+\caption{Модули системы и их функции}
+\label{tab:system_modules}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{4cm}|}
+\hline
+Модуль & Функция & Технологии \\
+\hline
+Collector & Сбор метрик, логов, трейсов & Prometheus, Elasticsearch, Jaeger \\
+\hline
+Analyzer & Обнаружение аномалий & Isolation Forest, LSTM \\
+\hline
+Diagnostic & Построение причинного графа & Корреляция, Granger \\
+\hline
+LLM Agent & Генерация рекомендаций & GPT-4, MCP \\
+\hline
+Orchestrator & Консенсус и планирование & Взвешенное голосование \\
+\hline
+Executor & Безопасное исполнение & Kubernetes API \\
+\hline
+\end{tabular}
+\end{table}
+
 \subsection{Data Collector}
 
 Модуль агрегирует данные из разнородных источников (Prometheus, Elasticsearch, Jaeger) \cite{prometheus_docs,elasticsearch_docs,jaeger_docs,opentelemetry}, приводя их к единой модели:
@@ -139,6 +163,24 @@ o_i^{(t+1)}(a) = \sum_{j=1}^{n} T_{ij} \cdot o_j^{(t)}(a), \quad \lim_{t \to \in
 \end{equation}
 где $T_{ij}$ --- элемент матрицы доверия ($\sum_j T_{ij} = 1$). Сходимость гарантирована при $\lambda_2(T) < 1$.
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+    agent/.style={rectangle, draw, fill=blue!15, minimum width=1.5cm, minimum height=0.6cm}]
+    \node[agent] (de) {Diagnostic};
+    \node[agent, below=0.5cm of de] (llm) {LLM};
+    \node[agent, below=0.5cm of llm] (rb) {Rule-based};
+    \node[agent, right=2cm of llm] (orch) {Orchestrator};
+    \node[agent, right=2cm of orch] (exec) {Executor};
+    \draw[->] (de) -- (orch);
+    \draw[->] (llm) -- (orch);
+    \draw[->] (rb) -- (orch);
+    \draw[->] (orch) -- (exec);
+\end{tikzpicture}
+\caption{Схема консенсуса агентов}
+\label{fig:agent_consensus}
+\end{figure}
+
 \textbf{Разрешение конфликтов.} При расхождении рекомендаций (например, Diagnostic Engine предлагает масштабирование, а LLM --- включение circuit breaker) оркестратор использует взвешенное голосование:
 \begin{equation}
 \text{Vote}(a) = \sum_{i=1}^{n} w_i \cdot \mathbf{1}[o_i(a) > \theta_{\text{support}}]
@@ -195,6 +237,42 @@ P(\text{success}|a, s) = \prod_{i=1}^{k} P_i(\text{success}|a, s)
 \end{cases}
 \label{eq:safety_levels}
 \end{equation}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Уровни безопасности действий восстановления}
+\label{tab:safety_levels}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{2.5cm}|}
+\hline
+Уровень & Условие & Режим & Примеры \\
+\hline
+Low & Risk $< \theta_1$ & Автоматический & Перезапуск пода \\
+\hline
+Medium & $\theta_1 \leq$ Risk $< \theta_2$ & Gradual rollout & Масштабирование \\
+\hline
+High & $\theta_2 \leq$ Risk $< \theta_3$ & С подтверждением & Откат деплоя \\
+\hline
+Critical & Risk $\geq \theta_3$ & Только вручную & Изменение конфигурации \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+    box/.style={rectangle, draw, fill=orange!15, minimum width=1.5cm, minimum height=0.6cm}]
+    \node[box] (validate) {Валидация};
+    \node[box, right=1cm of validate] (gradual) {Gradual};
+    \node[box, right=1cm of gradual] (rollback) {Откат};
+    \node[box, right=1cm of rollback] (limit) {Лимит};
+    \draw[->] (validate) -- (gradual);
+    \draw[->] (gradual) -- (rollback);
+    \draw[->] (rollback) -- (limit);
+\end{tikzpicture}
+\caption{Этапы безопасного исполнения}
+\label{fig:safe_execution}
+\end{figure}
 
 \medskip
 

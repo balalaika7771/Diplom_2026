@@ -12,6 +12,22 @@ T_{\text{delivery}} = T_{\text{build}} + T_{\text{test}} + T_{\text{deploy}} + T
 \label{eq:delivery_time}
 \end{equation}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.7, transform shape, font=\small,
+    stage/.style={rectangle, draw, fill=green!15, minimum width=1.2cm, minimum height=0.6cm}]
+    \node[stage] (build) {Build};
+    \node[stage, right=0.8cm of build] (test) {Test};
+    \node[stage, right=0.8cm of test] (deploy) {Deploy};
+    \node[stage, right=0.8cm of deploy] (verify) {Verify};
+    \draw[->] (build) -- (test);
+    \draw[->] (test) -- (deploy);
+    \draw[->] (deploy) -- (verify);
+\end{tikzpicture}
+\caption{Этапы CI/CD pipeline}
+\label{fig:cicd_pipeline}
+\end{figure}
+
 Время восстановления после инцидента:
 \begin{equation}
 \text{MTTR} = T_{\text{detection}} + T_{\text{diagnosis}} + T_{\text{recovery}} + T_{\text{verification}}
@@ -73,6 +89,24 @@ E[\text{damage}_{\text{BG}}] = p_{\text{error}} \cdot \text{Cost}(\text{test\_fa
 \label{eq:canary_success}
 \end{equation}
 
+\begin{table}[H]
+\centering
+\small
+\caption{Сравнение стратегий развёртывания}
+\label{tab:deploy_strategies}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{4.5cm}|}
+\hline
+Стратегия & Риск & Характеристика \\
+\hline
+Blue-Green & Низкий & Две среды, мгновенный откат \\
+\hline
+Canary & Средний & Постепенное увеличение трафика \\
+\hline
+Rolling & Средний & Пошаговое обновление реплик \\
+\hline
+\end{tabular}
+\end{table}
+
 При выполнении условия $\alpha$ постепенно увеличивается до~1. В сценарии~4 прототипа (раздел~\ref{ch:prototype}) агенты автоматически детектируют ухудшение метрик после деплоя и инициируют откат, что фактически реализует автоматический canary analysis.
 
 \section{SRE: SLO, SLI и Error Budget}
@@ -96,6 +130,24 @@ Service Level Indicator (SLI) измеряет фактический урове
 \text{SLI} = \frac{N_{\text{good}}}{N_{\text{total}}}
 \label{eq:sli}
 \end{equation}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Примеры SLO и соответствующих SLI}
+\label{tab:slo_sli_examples}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{4cm}|}
+\hline
+Сервис & SLO & SLI \\
+\hline
+API Gateway & Доступность 99.9\% & Uptime / Total time \\
+\hline
+Auth Service & Latency $<$ 100 мс & p99 response time \\
+\hline
+Database & Ошибки $<$ 0.1\% & Failed queries / Total \\
+\hline
+\end{tabular}
+\end{table}
 
 \textbf{Связь с агентами.} SLO и error budget задают внешние ограничения для Safe Executor: действия восстановления должны не только снижать MTTR конкретного инцидента, но и обеспечивать соблюдение SLO. Конкретный пример: при текущем $\text{SLI} = 99.92\%$ и $\text{SLO} = 99.9\%$ оставшийся error budget составляет $0.02\%$ --- агент переключается на консервативную стратегию: повышает порог $\theta_{\text{risk}}$ (формула \ref{eq:safety_criterion}) и допускает только действия с минимальным риском (перезапуск пода, увеличение реплик) и блокирует рискованные операции (изменение конфигурации, откат деплоя).
 
