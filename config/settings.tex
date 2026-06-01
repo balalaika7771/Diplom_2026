@@ -14,6 +14,16 @@
 % Межстрочный интервал 1.5 по ГОСТу
 \onehalfspacing
 
+% Убираем вертикальные отступы в списках (itemize, enumerate)
+\makeatletter
+\let\orig@listi\@listi
+\let\orig@listii\@listii
+\let\orig@listiii\@listiii
+\def\@listi{\orig@listi\topsep=0pt\itemsep=0pt\parsep=0pt\partopsep=0pt}
+\def\@listii{\orig@listii\topsep=0pt\itemsep=0pt\parsep=0pt\partopsep=0pt}
+\def\@listiii{\orig@listiii\topsep=0pt\itemsep=0pt\parsep=0pt\partopsep=0pt}
+\makeatother
+
 % Дополнительная растяжимость и толерантность для предотвращения Overfull hbox
 \tolerance=1000
 \emergencystretch=3em
