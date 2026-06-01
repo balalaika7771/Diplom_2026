@@ -28,7 +28,7 @@ P_p = \inf\{x : F(x) \geq p\}, \quad p \in \{0.50, 0.95, 0.99\}
 
 \textbf{Логи} $L(t) = \{l_1, l_2, \ldots, l_k\}$ представляют последовательности событий с временными метками, типами и контекстом. Структурированные логи (JSON) допускают машинный анализ; неструктурированные требуют NLP-обработки. LLM-компонент системы (разделы~\ref{ch:agents}, \ref{ch:architecture}) использует именно неструктурированные логи для извлечения диагностической информации, недоступной числовым методам.
 
-\textbf{Трейсы} $T(t)$ --- деревья spans, представляющие пути запросов через систему \cite{distributed_tracing,distributed_tracing_survey}:
+\textbf{Трейсы} $T(t)$ --- деревья spans, представляющие пути запросов через систему \cite{distributed_tracing,distributed_tracing_survey,acm_observability}:
 \begin{equation}
 s_i = (\text{service}_i, t_{\text{start},i}, t_{\text{end},i}, \text{status}_i, \text{parent}_i)
 \label{eq:span_tuple}
